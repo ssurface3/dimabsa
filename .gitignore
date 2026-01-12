@@ -4,3 +4,8 @@
 Downloads/
 models/
 results/
+plot_logs.py
+__pycache__/custom_trainer.cpython-312.pyc
+__pycache__/dataloader.cpython-312.pyc
+__pycache__/helper.cpython-312.pyc
+logs/deberta_v3_large_new_loss.csv

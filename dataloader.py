@@ -1,107 +1,98 @@
 import json
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
+from transformers import AutoTokenizer
+from tqdm import tqdm 
 
 class Dataloader(Dataset):
-    def __init__(self, pathx, tokenizer=None, max_len=128):
-        self.path = pathx
+    def __init__(self, data_source, model, max_len=128):
+        self.model = model
         self.max_len = max_len
-        self.tokenizer = tokenizer
-        self.data = [] 
-        self.load_data()
-        self.split()
+        self.data = data_source
+        self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.model, 
+                    use_fast=True  
+                )
 
-    def load_data(self):
+    @staticmethod
+    def _parse_jsonl(path):
         flattened_data = []
+        # Count lines first to provide a known total for tqdm.
+        with open(path, 'r', encoding='utf-8') as fh:
+            total_lines = sum(1 for _ in fh)
 
-        with open(self.path, 'r') as f:
-            for line in f:
+        # Re-open the file for parsing (keeps file open while iterating)
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in tqdm(f, total=total_lines, desc="Loading Data", unit="lines"):
+                line = line.strip()
+                if not line:
+                    continue
                 entry = json.loads(line)
+
                 entry_id = entry.get('ID')
                 text = entry.get('Text')
                 
                 if 'Quadruplet' in entry:
-                    quads = entry['Quadruplet']
-                    
-                    for quad in quads:
-
+                    for quad in entry['Quadruplet']:
                         aspect = quad.get('Aspect', 'NULL')
                         if aspect == "NULL":
-                            raw_cat = quad.get('Category', 'general')
-                            target = raw_cat.replace("#", " ")
+                            target = quad.get('Category', 'general').replace("#", " ")
                         else:
                             target = aspect
                         
-                        va_string = quad.get('VA', '5.0#5.0')
-                        
                         try:
-                            val_str, aro_str = va_string.split('#')
-                            val_float = float(val_str)
-                            aro_float = float(aro_str)
+                            val, aro = map(float, quad.get('VA', '5.0#5.0').split('#'))
                         except ValueError:
-                            val_float, aro_float = 5.0, 5.0
+                            val, aro = 5.0, 5.0
 
                         flattened_data.append({
-                            'ID': entry_id,
-                            'Text': text,
-                            'Target': str(target),
-                            'Valence': val_float,  
-                            'Arousal': aro_float,
-                            'VA' : quad.get('VA')
+                            'ID': entry_id, 'Text': text, 'Target': str(target),
+                            'Valence': val, 'Arousal': aro
                         })
 
                 elif 'Aspect' in entry:
                     raw_aspects = entry['Aspect']
-                    if not isinstance(raw_aspects, list): 
-                        raw_aspects = [raw_aspects]
+                    if not isinstance(raw_aspects, list): raw_aspects = [raw_aspects]
                     
                     for single_aspect in raw_aspects:
                         clean_target = str(single_aspect).replace("['", "").replace("']", "").replace("'", "").strip()
-                        
                         flattened_data.append({
-                            'ID': entry_id,
-                            'Text': text,
-                            'Target': clean_target,
-                            'Valence': 5.0, 
-                            'Arousal': 5.0,
-                            'VA' : '5.0#5.0'
+                            'ID': entry_id, 'Text': text, 'Target': clean_target,
+                            'Valence': 5.0, 'Arousal': 5.0
                         })
+        return flattened_data
 
-        self.data = flattened_data
+    @classmethod
+    def prepare_splits(cls, file_path, tokenizer, max_len=128, test_size=0.1):
+        full_data = cls._parse_jsonl(file_path)
+        
+        train_list, val_list = train_test_split(full_data, test_size=test_size, random_state=42)
+        
+        return cls(train_list, tokenizer, max_len), cls(val_list, tokenizer, max_len)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
-        """
-        Returns one item for the model to process.
-        """
         row = self.data[index]
         
-        text = str(row['Text'])
-        target = str(row['Target'])
-        
-       
         encoding = self.tokenizer(
-            text,
-            target,
+            str(row['Text']),
+            str(row['Target']),
             max_length=self.max_len,
             padding='max_length',
             truncation=True,
             return_tensors='pt'
         )
 
-        labels = torch.tensor([row['Valence'], row['Arousal']], dtype=torch.float)
-
-        return {
+        output = {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
-            'token_type_ids': encoding.get('token_type_ids', torch.tensor([])).flatten(),
-            'labels': labels
+            'labels': torch.tensor([row['Valence'], row['Arousal']], dtype=torch.float)
         }
-    def split(self, percentage = 0.9): 
-        full_df = pd.DataFrame(self.data)
-        self.train_df, self.val_df = train_test_split(full_df, test_size= 1- percentage, random_state=42)
-        return None
+        
+        if 'token_type_ids' in encoding:
+            output['token_type_ids'] = encoding['token_type_ids'].flatten()
+            
+        return output

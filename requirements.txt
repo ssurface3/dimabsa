@@ -4,3 +4,5 @@ torch
 scikit-learn 
 accelerate
 pydrive
+sentencepiece ==0.1.99 
+protobuf==3.20.3

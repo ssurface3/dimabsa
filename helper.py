@@ -19,8 +19,11 @@ class SpaceSaverCallback(TrainerCallback):
         except Exception as e:
             print(f"Could not clean up checkpoint: {e}")
 
+import torch
+import math
+import numpy as np
+
 def pearson_torch(preds, targets):
-    
     vx = preds - torch.mean(preds)
     vy = targets - torch.mean(targets)
     numerator = torch.sum(vx * vy)
@@ -30,32 +33,32 @@ def pearson_torch(preds, targets):
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
 
-    # if not isinstance(logits, torch.Tensor):
-    #     logits = torch.tensor(logits, dtype=torch.float32)
-    # if not isinstance(labels, torch.Tensor):
-    #     labels = torch.tensor(labels, dtype=torch.float32)
+    if not isinstance(logits, torch.Tensor):
+        logits = torch.tensor(logits, dtype=torch.float32)
+    if not isinstance(labels, torch.Tensor):
+        labels = torch.tensor(labels, dtype=torch.float32)
+
     pred_v = logits[:, 0]
     pred_a = logits[:, 1]
-
+    
     gold_v = labels[:, 0]
     gold_a = labels[:, 1]
 
     pcc_v = pearson_torch(pred_v, gold_v)
-    pcc_a = pearson_torch(pred_a, gold_a)    
-    sse_v = torch.sum((gold_v - pred_v) ** 2)
+    pcc_a = pearson_torch(pred_a, gold_a)
 
+    sse_v = torch.sum((gold_v - pred_v) ** 2)
     sse_a = torch.sum((gold_a - pred_a) ** 2)
     
     total_sse = sse_v + sse_a
-    n_samples = gold_v.shape[0] 
+    n_samples = gold_v.shape[0]
     
-    rmse_raw = torch.sqrt(total_sse / n_samples)
-    
+    rmse_va = torch.sqrt(total_sse / n_samples)
     
     return {
         'PCC_V': pcc_v.item(),
         'PCC_A': pcc_a.item(),
-        'RMSE_VA': rmse_raw.item() 
+        'RMSE_VA': rmse_va.item()
     }
 def save_training_history(trainer, args):
     os.makedirs("logs", exist_ok=True)

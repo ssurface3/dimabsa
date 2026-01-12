@@ -9,11 +9,14 @@ import warnings
 from transformers import (
     AutoModelForSequenceClassification, 
     TrainingArguments,
-    logging
+    logging,
+    AutoTokenizer
 )
 from dataloader import Dataloader
 from custom_trainer import CustomTrainer
 from helper import SpaceSaverCallback , compute_metrics , save_training_history 
+from tqdm import tqdm 
+from transformers import ProgressCallback
 
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
@@ -31,20 +34,16 @@ args = parser.parse_args()
 
 def main():
     print(f"Training: {args.model_name}") # watch out for the already establiashed one ! to retrain on the new dataset fro example
-    
-    DL = Dataloader(args.data_path)  
-    
-    train_dataset = DL.train_df
-
-    eval_dataset = DL.val_df
-    
+    model_old = 'microsoft/deberta-v3-large'
+    train_dataset, eval_dataset = Dataloader.prepare_splits(args.data_path, model_old)
+    print(f"Train size: {len(train_dataset)} | Eval size: {len(eval_dataset)}")
 
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name, 
         num_labels=2, 
         problem_type="regression",
     )
-    
+    print("Model loaded.")
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
         num_train_epochs=args.epochs,
@@ -58,7 +57,8 @@ def main():
         load_best_model_at_end=True,
         greater_is_better=False,
         report_to="none", 
-        fp16=torch.cuda.is_available()
+        fp16=torch.cuda.is_available(),
+        warmup_ratio=0.03 # added warmup ratio 
     )
 
     space_saver = SpaceSaverCallback()
@@ -68,13 +68,15 @@ def main():
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
                 compute_metrics=compute_metrics,
-                callbacks=[space_saver]
+                callbacks=[space_saver,ProgressCallback()]
             )
 
     if args.resume_from_checkpoint:
         trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
     else:
+        print("Starting training...")
         trainer.train()
+        print("Training completed.")
 
     final_path = f"./models/{args.output_dir}/final"
     trainer.save_model(final_path)    
