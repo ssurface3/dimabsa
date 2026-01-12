@@ -1,0 +1,6 @@
+*.safetensors
+*.bin
+*.pth
+Downloads/
+models/
+results/
