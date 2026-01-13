@@ -21,9 +21,16 @@ from transformers import ProgressCallback
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
+try:
+    import torch._dynamo as _dynamo
+    _dynamo.disable()
+except Exception:
+    pass
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name", type=str, default="bert-base-uncased")
-parser.add_argument("--data_path", type=str, default="data/train.jsonl")
+parser.add_argument("--data_train_path", type=str, default="data/train.jsonl")
+parser.add_argument("--data_val_path", type=str, default="data/eval.jsonl")
 parser.add_argument("--output_dir", type=str, required=True)
 parser.add_argument("--epochs", type=int, default=5)
 parser.add_argument("--batch_size", type=int, default=16)
@@ -34,8 +41,8 @@ args = parser.parse_args()
 
 def main():
     print(f"Training: {args.model_name}") # watch out for the already establiashed one ! to retrain on the new dataset fro example
-    model_old = 'microsoft/deberta-v3-large'
-    train_dataset, eval_dataset = Dataloader.prepare_splits(args.data_path, model_old)
+    train_dataset = Dataloader._parse_jsonl(args.data_train_path)
+    eval_dataset = Dataloader._parse_jsonl(args.data_val_path)
     print(f"Train size: {len(train_dataset)} | Eval size: {len(eval_dataset)}")
 
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -58,7 +65,7 @@ def main():
         greater_is_better=False,
         report_to="none", 
         fp16=torch.cuda.is_available(),
-        warmup_ratio=0.03 # added warmup ratio 
+        warmup_ratio=0.05 # added warmup ratio 
     )
 
     space_saver = SpaceSaverCallback()
