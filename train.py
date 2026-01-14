@@ -1,7 +1,17 @@
 import os    
 import shutil
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Silence TensorFlow/CUDA
-os.environ['WANDB_SILENT'] = 'true'       # Silence WandB
+# kill errors!!
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("torch").setLevel(logging.ERROR)
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["GRPC_VERBOSITY"] = "ERROR"
+os.environ["GLOG_minloglevel"] = "3"
+
+stderr_backup = sys.stderr
+sys.stderr = open(os.devnull, "w")
+
+
 
 import argparse
 import torch
@@ -13,7 +23,7 @@ from transformers import (
     AutoTokenizer
 )
 from dataloader import Dataloader
-from custom_trainer import CustomTrainer
+from custom_trainer_normalized import CustomTrainer
 from helper import SpaceSaverCallback , compute_metrics , save_training_history 
 from tqdm import tqdm 
 from transformers import ProgressCallback
@@ -38,15 +48,19 @@ parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--lr", type=float, default=2e-5)
 parser.add_argument("--grad_accum", type=int, default=1)
 parser.add_argument("--resume_from_checkpoint", type=str, default=None)
+parser.add_argument("--max_len", type=int, default=50)
+# parser.add_argument("--normalize", type=str, default="standard")  # standard or normalized 
 args = parser.parse_args()
 
 def main():
     print(f"Training: {args.model_name}") # watch out for the already establiashed one ! to retrain on the new dataset fro example
+    print(f"Train data: {args.train_data_path}")
+    print(f"Eval data: {args.eval_data_path}") 
+
     train_list = Dataloader._parse_jsonl(args.train_data_path)
     eval_list = Dataloader._parse_jsonl(args.eval_data_path)
-    train_dataset = Dataloader(train_list, args.model_name, max_len=50)
-    eval_dataset = Dataloader(eval_list, args.model_name, max_len=50)
-
+    train_dataset = Dataloader(train_list, args.model_name, max_len=args.max_len)
+    eval_dataset = Dataloader(eval_list, args.model_name, max_len=args.max_len)
     print(f"Train size: {len(train_dataset)} | Eval size: {len(eval_dataset)}")
 
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -55,6 +69,23 @@ def main():
         problem_type="regression",
     )
     print("Model loaded.")
+    # training_args = TrainingArguments(
+    #     output_dir=f"./models/{args.output_dir}",
+    #     num_train_epochs=args.epochs,
+    #     per_device_train_batch_size=args.batch_size,
+    #     per_device_eval_batch_size=args.batch_size,
+    #     gradient_accumulation_steps=args.grad_accum,
+    #     learning_rate=args.lr,
+    #     eval_strategy="epoch",
+    #     save_strategy="epoch",
+    #     save_total_limit=1,
+    #     load_best_model_at_end=True,
+    #     greater_is_better=False,
+    #     report_to="none", 
+    #     fp16=torch.cuda.is_available(),
+    #     warmup_ratio=0.05 # added warmup ratio 
+    # )
+
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
         num_train_epochs=args.epochs,
@@ -62,34 +93,17 @@ def main():
         per_device_eval_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
-        eval_strategy="epoch",
+        eval_strategy="steps",
+        eval_steps=50,
         save_strategy="epoch",
         save_total_limit=1,
-        load_best_model_at_end=True,
+        logging_steps=10,
+        # load_best_model_at_end=True,
         greater_is_better=False,
         report_to="none", 
         fp16=torch.cuda.is_available(),
         warmup_ratio=0.05 # added warmup ratio 
     )
-
-    #   training_args = TrainingArguments(
-    #     output_dir=f"./models/{args.output_dir}",
-    #     num_train_epochs=args.epochs,
-    #     per_device_train_batch_size=args.batch_size,
-    #     per_device_eval_batch_size=args.batch_size,
-    #     gradient_accumulation_steps=args.grad_accum,
-    #     learning_rate=args.lr,
-    #     eval_strategy="steps",
-    #     eval_steps=50,
-    #     save_strategy="epoch",
-    #     save_total_limit=1,
-    #     logging_steps=10,
-    #     load_best_model_at_end=True,
-    #     greater_is_better=False,
-    #     report_to="none", 
-    #     fp16=torch.cuda.is_available(),
-    #     warmup_ratio=0.05 # added warmup ratio 
-    # )
 
     space_saver = SpaceSaverCallback()
     trainer = CustomTrainer(
