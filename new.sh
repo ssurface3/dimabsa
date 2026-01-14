@@ -1,15 +1,17 @@
 #!/bin/bash
 set -e
 
-MODEL="microsoft/deberta-v3-large"
-BS=4
+MODEL="jhu-clsp/mmBERT-base"
+BS=18
 ACCUM=4
-LR=1.2e-5
-EPOCHS=5
-EXP_ID="deberta_v3_large_new_loss_warmup_lower_lr"
+LR=1e-5
+EPOCHS=5 
+EXP_ID="jhu-clsp/mmBERT-base-finetuned-dimabsa-laptop-alltasks"
 
-TRAIN_DATA="/kaggle/working/dimabsa/data/eng_laptop_train_alltasks.jsonl"
-TEST_DATA="data/eng_laptop_dev_alltasks.jsonl" 
+TRAIN_DATA="/kaggle/working/dimabsa/data_split/train.jsonl"
+EVAL_DATA="/kaggle/working/dimabsa/data_split/dev.jsonl"
+TEST_DATA="/kaggle/working/dimabsa/data_split/test.jsonl"
+export TORCHDYNAMO_DISABLE=1
 
 mkdir -p results
 
@@ -19,7 +21,9 @@ echo "----------------------------------------------------"
 
 python train.py \
     --model_name "$MODEL" \
-    --data_path "$TRAIN_DATA" \
+    --train_data_path "$TRAIN_DATA" \
+    --eval_data_path "$EVAL_DATA" \
+    --test_data_path "$TEST_DATA" \
     --output_dir "$EXP_ID" \
     --epochs $EPOCHS \
     --batch_size $BS \
@@ -39,3 +43,4 @@ python generate_sub.py \
     --batch_size 16
 
 echo "submission is generated"
+

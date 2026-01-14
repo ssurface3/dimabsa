@@ -39,4 +39,31 @@ class CustomTrainer(Trainer):
             'PCC_A': pcc_a.item(),
             'RMSE_VA': rmse_va.item()
         }
+    @staticmethod
+    def loss_fct(logits, labels):
         
+        pred_v = logits[:, 0]
+        pred_a = logits[:, 1]
+        
+        gold_v = labels[:, 0]
+        gold_a = labels[:, 1]
+
+        pcc_v = self.pearson_torch(pred_v, gold_v)
+        pcc_a = self.pearson_torch(pred_a, gold_a)
+
+        sse_v = torch.sum((gold_v - pred_v) ** 2)
+        sse_a = torch.sum((gold_a - pred_a) ** 2)
+           
+        total_sse = sse_v + sse_a
+    
+        n_samples = gold_v.shape[0]
+        
+        rmse_va = torch.sqrt(total_sse / n_samples)
+        return rmse_va + 2 - pcc_v - pcc_a
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        labels = inputs.get("labels")
+        outputs = model(**inputs)
+        logits = outputs.get("logits")
+        loss = loss_fct(logits, labels)
+        return (loss, outputs) if return_outputs else loss

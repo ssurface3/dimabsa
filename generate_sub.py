@@ -110,7 +110,6 @@ def main():
             json.dump(final_json, f, indent=4, ensure_ascii=False)
 
         csv_filename = out_json.replace(".json", ".csv")
-        pd.DataFrame(csv_data).to_csv(csv_filename, index=False)
 
 if __name__ == "__main__":
     main()
