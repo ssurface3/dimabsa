@@ -94,7 +94,7 @@ def main():
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         eval_strategy="steps",
-        eval_steps=50,
+        eval_steps=100,
         save_strategy="epoch",
         save_total_limit=1,
         logging_steps=10,

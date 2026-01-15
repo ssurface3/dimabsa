@@ -1,15 +1,18 @@
 import os    
 import shutil
-# kill errors!!
-logging.getLogger("transformers").setLevel(logging.ERROR)
-logging.getLogger("torch").setLevel(logging.ERROR)
+import sys
+import logging
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["GRPC_VERBOSITY"] = "ERROR"
-os.environ["GLOG_minloglevel"] = "3"
+# # kill errors!!
+# logging.getLogger("transformers").setLevel(logging.ERROR)
+# logging.getLogger("torch").setLevel(logging.ERROR)
 
-stderr_backup = sys.stderr
-sys.stderr = open(os.devnull, "w")
+# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+# os.environ["GRPC_VERBOSITY"] = "ERROR"
+# os.environ["GLOG_minloglevel"] = "3"
+
+# stderr_backup = sys.stderr
+# sys.stderr = open(os.devnull, "w")
 
 
 
@@ -28,8 +31,8 @@ from helper import SpaceSaverCallback , compute_metrics , save_training_history
 from tqdm import tqdm 
 from transformers import ProgressCallback
 
-logging.set_verbosity_error()
-warnings.filterwarnings("ignore")
+# logging.set_verbosity_error()
+# warnings.filterwarnings("ignore")
 
 try:
     import torch._dynamo as _dynamo

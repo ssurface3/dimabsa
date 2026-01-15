@@ -6,7 +6,8 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
-from scipy.stats import pearsonr, expit
+from scipy.stats import pearsonr
+from scipy.special import expit
 from sklearn.metrics import mean_squared_error
 
 class LocalEvalDataset(Dataset):
@@ -72,6 +73,7 @@ def load_eval_data(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, required=True)
+    parser.add_argument("--model_name", type=str, default="jhu-clsp/mmBERT-base")
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--max_len", type=int, default=128)
@@ -83,11 +85,8 @@ def main():
     try:
         tokenizer = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
     except:
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(args.model_path, use_fast=False)
-        except:
-            print("Local tokenizer missing. Downloading bert-base-uncased.")
-            tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        print("Local tokenizer missing." + args.model_name + " will be used.")
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -134,7 +133,7 @@ def main():
     preds = torch.cat(preds_list, dim=0).numpy()
     truth = torch.cat(labels_list, dim=0).numpy()
 
-    preds = expit(preds) * + 1 # scale to [1, 9]
+    preds = expit(preds) * 8 + 1 # scale to [1, 9]
 
     pcc_v, _ = pearsonr(preds[:, 0], truth[:, 0])
     pcc_a, _ = pearsonr(preds[:, 1], truth[:, 1])
@@ -153,6 +152,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-# python /kaggle/working/slop/al.py \
+# python al.py \
 #     --model_path "/kaggle/working/dimabsa/models/jhu-clsp/mmBERT-base-finetuned-dimabsa-laptop-alltasks/final" \
 #     --data_path "/kaggle/working/dimabsa/data_split/test.jsonl"

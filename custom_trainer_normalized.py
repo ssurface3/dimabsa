@@ -73,3 +73,6 @@ class CustomTrainer(Trainer):
         logits = outputs.get("logits")
         loss = self.loss_fct(logits, labels)
         return (loss, outputs) if return_outputs else loss
+    def get_train_dataloader(self):
+
+        return 

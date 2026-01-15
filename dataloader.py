@@ -18,11 +18,10 @@ class Dataloader(Dataset):
     @staticmethod
     def _parse_jsonl(path):
         flattened_data = []
-        # Count lines first to provide a known total for tqdm.
+        print("Parsing JSONL data from:", path)
         with open(path, 'r', encoding='utf-8') as fh:
             total_lines = sum(1 for _ in fh)
-
-        # Re-open the file for parsing (keeps file open while iterating)
+        print('loading data from:', path)
         with open(path, 'r', encoding='utf-8') as f:
             for line in tqdm(f, total=total_lines, desc="Loading Data", unit="lines"):
                 line = line.strip()
@@ -61,10 +60,13 @@ class Dataloader(Dataset):
                             'ID': entry_id, 'Text': text, 'Target': clean_target,
                             'Valence': 5.0, 'Arousal': 5.0
                         })
+        print(f"Loaded {len(flattened_data)} samples from {path}")
         return flattened_data
 
     @classmethod
-    def prepare_splits(cls, file_path, tokenizer, max_len=128, test_size=0.1):
+    def prepare_splits(cls, file_path, tokenizer = None, max_len=128, test_size=0.1):
+        if tokenizer is None:
+            tokenizer = self.tokenizer
         full_data = cls._parse_jsonl(file_path)
         
         train_list, val_list = train_test_split(full_data, test_size=test_size, random_state=42)
