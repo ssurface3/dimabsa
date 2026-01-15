@@ -23,7 +23,8 @@ from transformers import (
     AutoModelForSequenceClassification, 
     TrainingArguments,
     logging,
-    AutoTokenizer
+    AutoTokenizer, 
+    AutoConfig
 )
 from dataloader import Dataloader
 from custom_trainer_normalized import CustomTrainer
@@ -66,29 +67,34 @@ def main():
     eval_dataset = Dataloader(eval_list, args.model_name, max_len=args.max_len)
     print(f"Train size: {len(train_dataset)} | Eval size: {len(eval_dataset)}")
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name, 
-        num_labels=2, 
-        problem_type="regression",
+    config = AutoConfig.from_pretrained(
+        args.model_name,
+        num_labels=2,
+        problem_type="regression"
     )
-    print("Model loaded.")
-    # training_args = TrainingArguments(
-    #     output_dir=f"./models/{args.output_dir}",
-    #     num_train_epochs=args.epochs,
-    #     per_device_train_batch_size=args.batch_size,
-    #     per_device_eval_batch_size=args.batch_size,
-    #     gradient_accumulation_steps=args.grad_accum,
-    #     learning_rate=args.lr,
-    #     eval_strategy="epoch",
-    #     save_strategy="epoch",
-    #     save_total_limit=1,
-    #     load_best_model_at_end=True,
-    #     greater_is_better=False,
-    #     report_to="none", 
-    #     fp16=torch.cuda.is_available(),
-    #     warmup_ratio=0.05 # added warmup ratio 
-    # )
+    if hasattr(config, "attention_probs_dropout_prob"):
+        config.attention_probs_dropout_prob = 0.0
+    if hasattr(config, "hidden_dropout_prob"):
+        config.hidden_dropout_prob = 0.0
+    if hasattr(config, "classifier_dropout"):
+        config.classifier_dropout = 0.0
+    
 
+    try:
+        model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_name,
+            config=config,
+            ignore_mismatched_sizes=True
+        )
+    except Exception as e:
+        print(f"Standard load failed: {e}")
+        model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_name,
+            config=config,
+            ignore_mismatched_sizes=True,
+            trust_remote_code=True 
+        )
+    print("Model loaded.")
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
         num_train_epochs=args.epochs,
