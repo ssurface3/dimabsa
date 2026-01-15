@@ -44,6 +44,9 @@ def compute_metrics(eval_pred):
     gold_v = labels[:, 0]
     gold_a = labels[:, 1]
 
+    pred_v = torch.sigmoid(pred_v) * 8 + 1 # scale to [1, 9]
+    pred_a =  torch.sigmoid(pred_a) * 8 + 1 # scale to [1, 9]
+    
     pcc_v = pearson_torch(pred_v, gold_v)
     pcc_a = pearson_torch(pred_a, gold_a)
 

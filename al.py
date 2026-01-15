@@ -6,7 +6,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, expit
 from sklearn.metrics import mean_squared_error
 
 class LocalEvalDataset(Dataset):
@@ -134,7 +134,7 @@ def main():
     preds = torch.cat(preds_list, dim=0).numpy()
     truth = torch.cat(labels_list, dim=0).numpy()
 
-    preds = np.clip(preds, 1.0, 9.0)
+    preds = expit(preds) * + 1 # scale to [1, 9]
 
     pcc_v, _ = pearsonr(preds[:, 0], truth[:, 0])
     pcc_a, _ = pearsonr(preds[:, 1], truth[:, 1])
