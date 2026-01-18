@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
 from scipy.special import expit
+
 class InferenceDataset(Dataset):
     def __init__(self, data, tokenizer, max_len):
         self.data = data
@@ -55,7 +56,16 @@ def parse_jsonl(path):
                 raw = entry['Aspect']
                 raw_list = [raw] if not isinstance(raw, list) else raw
                 for item in raw_list:
-                    clean = str(item).replace("['", "").replace("']", "").replace("'", "").strip()
+                    # --- FIX START ---
+                    # Handles ['text'] artifacts without deleting internal apostrophes
+                    item_str = str(item).strip()
+                    if item_str.startswith("['") and item_str.endswith("']"):
+                        clean = item_str[2:-2]
+                    elif item_str.startswith("[\"") and item_str.endswith("\"]"):
+                        clean = item_str[2:-2]
+                    else:
+                        clean = item_str
+                    # --- FIX END ---
                     targets.append(clean)
             
             for t in targets:
@@ -75,13 +85,9 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
-    except:
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(args.model_path, use_fast=False)
-        except:
-            tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
+   
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -97,7 +103,6 @@ def main():
     
     results = []
 
-    
     with torch.no_grad():
         for batch in tqdm(loader, desc=f"Processing {os.path.basename(args.test_file)}"):
             input_ids = batch['input_ids'].to(device)
@@ -115,8 +120,8 @@ def main():
     
     for i, row in enumerate(raw_data):
         if i >= len(results): break
-        val_pred = expit(float(results[i][0])) * 8 + 1 # valence prediction
-        aro_pred = expit(float(results[i][1])) * 8 + 1 # arousal prediction
+        val_pred = expit(float(results[i][0])) * 8 + 1 
+        aro_pred = expit(float(results[i][1])) * 8 + 1 
 
         val_str = f"{val_pred:.2f}"
         aro_str = f"{aro_pred:.2f}"

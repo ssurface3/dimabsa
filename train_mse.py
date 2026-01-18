@@ -49,6 +49,7 @@ parser.add_argument("--lr", type=float, default=2e-5)
 parser.add_argument("--grad_accum", type=int, default=1)
 parser.add_argument("--resume_from_checkpoint", type=str, default=None)
 parser.add_argument("--max_len", type=int, default=50)
+parser.add_argument("--filter_lang", type=str, default=None)  # 'zho' for Chinese, 'eng' for English, None for all
 # parser.add_argument("--normalize", type=str, default="standard")  # standard or normalized 
 args = parser.parse_args()
 
@@ -56,9 +57,13 @@ def main():
     print(f"Training: {args.model_name}") # watch out for the already establiashed one ! to retrain on the new dataset fro example
     print(f"Train data: {args.train_data_path}")
     print(f"Eval data: {args.eval_data_path}") 
-
-    train_list = Dataloader._parse_jsonl(args.train_data_path)
-    eval_list = Dataloader._parse_jsonl(args.eval_data_path)
+    if args.filter_lang:
+        print(f"Filtering language: {args.filter_lang}")    
+        train_list = Dataloader._parse_jsonl(args.train_data_path,filter_lang=args.filter_lang)
+        eval_list = Dataloader._parse_jsonl(args.eval_data_path,filter_lang=args.filter_lang)
+    else:
+        train_list = Dataloader._parse_jsonl(args.train_data_path)
+        eval_list = Dataloader._parse_jsonl(args.eval_data_path)
     train_dataset = Dataloader(train_list, args.model_name, max_len=args.max_len)
     eval_dataset = Dataloader(eval_list, args.model_name, max_len=args.max_len)
     print(f"Train size: {len(train_dataset)} | Eval size: {len(eval_dataset)}")

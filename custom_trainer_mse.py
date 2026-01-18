@@ -85,5 +85,5 @@ class CustomTrainer(Trainer):
         labels = inputs.get("labels")
         outputs = model(**inputs)
         logits = outputs.get("logits")
-        loss = self.mse_loss_fct(logits, labels)    
+        loss = self.loss_fct(logits, labels)    
         return (loss, outputs) if return_outputs else loss
