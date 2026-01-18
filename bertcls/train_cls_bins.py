@@ -13,8 +13,8 @@ from transformers import (
     # AutoTokenizer, 
     AutoConfig
 )
-from dataloader import Dataloader
-from bertcls.custom_trainer_normalized import CustomTrainer
+from dataloader_cls import Dataloader
+from custom_trainer_cls import CustomTrainer
 from helper import (
                     #  SpaceSaverCallback , 
                     compute_metrics , 
@@ -22,7 +22,7 @@ from helper import (
                  )
 # from tqdm import tqdm 
 # from transformers import ProgressCallback
-from Twohead import TwoheadModel
+from Twohead import TwoHeadModel
 
 try:
     import torch._dynamo as _dynamo
@@ -60,23 +60,24 @@ def main():
         num_labels=32, # two head with 32 bins each
         problem_type= 'single_label_classification'
     )
-    
-    
+    # костыли, потому что у модер берта нет таких вещиц 
+    config.type_vocab_size = 2
+    config.hidden_dropout_prob = 0.0
+    config.attention_probs_dropout_prob = 0.0
+    # for key in dir(config):
+    #     if "dropout" in key and not key.startswith("_"):
+    #         val = getattr(config, key)
+    #         if isinstance(val, (float, int)):
+    #             setattr(config, key, 0.0)
+    #             print(f"   -> Set {key} = 0.0")
 
-    try:
-        model = TwoheadModel.from_pretrained(
-            args.model_name,
-            config=config,
-            ignore_mismatched_sizes=True
-        )
-    except Exception as e:
-        print(f"Standard load failed: {e}")
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_name,
-            config=config,
-            ignore_mismatched_sizes=True,
-            trust_remote_code=True 
-        )
+
+    model = TwoHeadModel.from_pretrained(
+        args.model_name,
+        config=config,
+        ignore_mismatched_sizes=True
+    )
+
     print("Model loaded.")
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
@@ -94,6 +95,7 @@ def main():
         greater_is_better=False,
         report_to="none", 
         fp16=torch.cuda.is_available(),
+        remove_unused_columns=False, # i donno ??
         warmup_ratio=0.05 # added warmup ratio 
     )
 

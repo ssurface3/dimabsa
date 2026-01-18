@@ -45,7 +45,7 @@ class Dataloader(Dataset):
                             # there is no need to guess the exact values as it is seriously peanlized 
                             # however, we still need to distniguish between 5.15 and 5.25 however , they are almost identical 
                         except ValueError:
-                            val, aro = 0.5, 0.5
+                            val, aro = 5 , 5 
 
 
                         flattened_data.append({
@@ -58,10 +58,17 @@ class Dataloader(Dataset):
                     if not isinstance(raw_aspects, list): raw_aspects = [raw_aspects]
                     
                     for single_aspect in raw_aspects:
-                        clean_target = str(single_aspect).replace("['", "").replace("']", "").replace("'", "").strip()
+                        if raw_str.startswith("['") and raw_str.endswith("']"):
+                            clean_target = raw_str[2:-2]
+                        elif raw_str.startswith("[\"") and raw_str.endswith("\"]"):
+                            clean_target = raw_str[2:-2]
+                        else:
+                            clean_target = raw_str
+                        
+                        clean_target = clean_target.strip()
                         flattened_data.append({
                             'ID': entry_id, 'Text': text, 'Target': clean_target,
-                            'Valence': 0.5, 'Arousal': 0.5
+                            'Valence': 5, 'Arousal': 5
                         })
         return flattened_data
 
