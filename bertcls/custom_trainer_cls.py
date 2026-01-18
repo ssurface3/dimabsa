@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from transformers import Trainer
 
 class CustomTrainer(Trainer): 
@@ -30,31 +29,39 @@ class CustomTrainer(Trainer):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
 
-        if hasattr(outputs, "logits") and isinstance(outputs.logits, tuple):
-            logits_v, logits_a = outputs.logits
-        elif isinstance(outputs, tuple):
-            logits_v, logits_a = outputs[0], outputs[1]
+        if hasattr(outputs, "logits"):
+            preds = outputs.logits
         else:
-            logits_v, logits_a = outputs
+            preds = outputs
+
+        if isinstance(preds, (tuple, list)):
+            logits_v, logits_a = preds
+        else:
+            # Fallback if model outputs one large tensor
+            logits_v = preds[:, :32]
+            logits_a = preds[:, 32:]
 
         target_v = self.score_to_bin(labels[:, 0]).to(logits_v.device)
         target_a = self.score_to_bin(labels[:, 1]).to(logits_a.device)
 
         loss_v = self.ce_loss(logits_v, target_v)
         loss_a = self.ce_loss(logits_a, target_a)
-
+        
         loss = loss_v + loss_a
 
-        return (loss, (logits_v, logits_a)) if return_outputs else loss
+        # Concatenate back to (Batch, 64) so compute_metrics can slice it
+        logits = torch.cat([logits_v, logits_a], dim=1)
+
+        return (loss, logits) if return_outputs else loss
 
     def compute_metrics(self, eval_pred):
-        predictions, labels = eval_pred
+        logits, labels = eval_pred
         
-        logits_v, logits_a = predictions
-        
-        logits_v = torch.tensor(logits_v)
-        logits_a = torch.tensor(logits_a)
+        logits = torch.tensor(logits)
         labels = torch.tensor(labels)
+        
+        logits_v = logits[:, :32]
+        logits_a = logits[:, 32:]
 
         pred_bin_v = torch.argmax(logits_v, dim=1)
         pred_bin_a = torch.argmax(logits_a, dim=1)
