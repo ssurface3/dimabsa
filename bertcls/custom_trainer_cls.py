@@ -37,7 +37,6 @@ class CustomTrainer(Trainer):
         if isinstance(preds, (tuple, list)):
             logits_v, logits_a = preds
         else:
-            # Fallback if model outputs one large tensor
             logits_v = preds[:, :32]
             logits_a = preds[:, 32:]
 
@@ -49,7 +48,6 @@ class CustomTrainer(Trainer):
         
         loss = loss_v + loss_a
 
-        # Concatenate back to (Batch, 64) so compute_metrics can slice it
         logits = torch.cat([logits_v, logits_a], dim=1)
 
         return (loss, logits) if return_outputs else loss
