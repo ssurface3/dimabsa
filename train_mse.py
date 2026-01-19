@@ -38,7 +38,7 @@ except Exception:
     pass
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name", type=str, default="bert-base-uncased")
+parser.add_argument("--model_name", type=str, default="hfl/chinese-macbert-large")
 parser.add_argument("--train_data_path", type=str, default="data/train.jsonl")
 parser.add_argument("--eval_data_path", type=str, default="data/eval.jsonl")
 parser.add_argument("--test_data_path", type=str, default="data/eval.jsonl")

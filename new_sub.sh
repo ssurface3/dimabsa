@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-MODEL_PATH="/kaggle/working/dimabsa/models/jhu-clsp/mmBERT-base-finetuned-dimabsa-laptop-alltasks/final"
+MODEL_PATH="models/jhu-clsp/mmBERT-base-finetuned-dimabsa-laptop-alltasks/final"
 DATA_DIR="/kaggle/working/dimabsa/data_sub_dimabsa"
 SUBMISSION_FOLDER="subtask_1" 
 BATCH_SIZE=32
@@ -38,7 +38,7 @@ for f in "$DATA_DIR"/*dev*.jsonl; do
   
   echo "Generating: pred_${clean_name}.jsonl"
   
-  python /kaggle/working/dimabsa/generate_submssion.py \
+  python generate_sub.py \
       --model_path "$MODEL_PATH" \
       --test_file "$f" \
       --output_file "$output_file" \

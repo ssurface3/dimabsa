@@ -5,13 +5,12 @@ set -e
 # export GRPC_VERBOSITY=ERROR
 # export GLOG_minloglevel=3
 
-# MODEL="jhu-clsp/mmBERT-base"
-MODEL="hfl/chinese-macbert-large"
+MODEL="jhu-clsp/mmBERT-base"
 BS=18
 ACCUM=4
 LR=1e-5
 EPOCHS=5 
-EXP_ID="hfl/chinese-macbert-large-finetuned-dimabsa-laptop-alltasks"
+EXP_ID="jhu-clsp/mmBERT-base-finetuned-dimabsa-laptop-alltasks"
 
 TRAIN_DATA="/kaggle/working/dimabsa/data_final/train_with_chinese.jsonl"
 EVAL_DATA="/kaggle/working/dimabsa/data_final/dev_with_chinese.jsonl"
