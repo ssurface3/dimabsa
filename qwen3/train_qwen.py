@@ -3,15 +3,22 @@ import shutil
 import argparse
 import torch
 from transformers import (
-    Qwen3ForSequenceClassification,
+    AutoModelForCausalLM,
     Trainer, 
     TrainingArguments,
-    AutoConfig
+    AutoConfig,
+    AutoTokenizer,
+    DataCollatorForLanguageModeling,
+    DefaultFlowCallback 
 )
+import bitsandbytes
+os.environ["TORCHDYNAMO_DISABLE"] = "1" 
 from datasett import QwenDataset
+import flash_attn
 # from basic_new_mseloss import CustomTrainer
 from helper import (
-                    save_training_history 
+                    save_training_history,
+                    PrinterCallback
                  )
 # if we need some new model head 
 # from Twohead import TwoheadModel
@@ -56,33 +63,45 @@ def main():
                               )
     print(f"Train size: {len(train_dataset)} | Eval size: {len(eval_dataset)}")
 
-    config = AutoConfig.from_pretrained(args.model_name
-                                        , num_labels = 2, 
-                                        problem_type = 'regression',
-                                        trust_remote_code = 'True'
-                                        )
-
-    model = Qwen3ForSequenceClassification.from_pretrained(
+    # config = AutoConfig.from_pretrained(args.model_name,
+    #                                     num_labels = 2, 
+    #                                     problem_type = 'regression',
+    #                                     trust_remote_code = 'True',
+    #                                     torch_dtype = torch.bfloat16, 
+    #                                     attn_implementation="flash_attention_2"
+                                    
+    #                                     )
+    print('loading model')
+    model = AutoModelForCausalLM.from_pretrained(
             args.model_name, 
-            num_labels=2  , 
-            config=config , 
+            # config=config , 
             torch_dtype = torch.bfloat16, 
-            attn_implementation="flash_attention_2" # need to import it
+            # attn_implementation="flash_attention_2", # need to import it
+            trust_remote_code = 'True',
         )   
-    
+    print('loaded model ')
     #Lora part
-    if args.lora: 
+    if args.lora:
+        print('Lora activated')
         peft_config = LoraConfig(
-                task_type=TaskType.SEQ_CLS, # maybe question_ans
+                task_type=TaskType.CAUSAL_LM, # maybe question_ans
                 inference_mode=False,
                 r=16,           
                 lora_alpha=32,    
                 lora_dropout=0.1,
-                target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+                target_modules=["q_proj", "v_proj"]
         )
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters() # telss how much parameters we are changing
-        collator = Dataloader.get_collatoral()
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_name, 
+            return_tensors="pt",
+        )
+        collator = DataCollatorForLanguageModeling(
+            tokenizer,
+            mlm=False 
+
+        )
         print("Model loaded.")
         training_args = TrainingArguments(
                         output_dir=args.output_dir,
@@ -99,14 +118,14 @@ def main():
                         #Logging and Saving
                         logging_steps=10,             
                         save_strategy="steps",
-                        save_steps=750         
+                        save_steps=300,
                         
                         #Evaluation
-                        evaluation_strategy="no", 
+                        # evaluation_strategy="no", 
                         eval_strategy= 'steps', 
                         eval_steps = 75, 
                         load_best_model_at_end=True, # Save the best version, not the last version       
-                        metric_for_best_model='loss'
+                        metric_for_best_model='loss',
                         #Optimizer
                         optim="paged_adamw_32bit",      
                         warmup_ratio=0.05,
@@ -114,12 +133,15 @@ def main():
                     )
 
     # space_saver = SpaceSaverCallback()
+    prompt_text = 
+    printer = PrinterCallback(model = model,tokenizer = tokenizer, prompt_text = "Отдельно хочется отметить качество живой музыки!", "Quadruplet":"Aspect": "живой музыки", "Opinion": "хочется отметить качество", "Category": "AMBIENCE#GENERAL"")
     trainer = Trainer(
                 model=model,
                 args=training_args,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset, 
-                data_collator = collator
+                data_collator = collator,
+                callbacks = [printer ,DefaultFlowCallback()]
             )
 
     if args.resume_from_checkpoint:
