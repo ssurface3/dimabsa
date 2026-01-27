@@ -7,9 +7,9 @@ set -e
 
 # MODEL="Qwen/Qwen3-Embedding-8B"
 MODEL='Qwen/Qwen3-0.6B'
-BS=20
-ACCUM=4
-LR=1e-5
+BS=8
+ACCUM=8
+LR=1e-4
 EPOCHS=3
 EXP_ID="Qwen/Qwen3-0.6B-dimabsa-alltasks"
 
@@ -36,10 +36,6 @@ python /kaggle/working/dimabsa/qwen3/train_qwen.py \
     --lr $LR 
 
 echo "training is over"
-
-echo "----------------------------------------------------"
-echo "Starting inference on test set"
-echo "----------------------------------------------------"
 
 
 

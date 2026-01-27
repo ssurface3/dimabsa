@@ -88,7 +88,7 @@ class PrinterCallback(TrainerCallback):
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs, 
-                    max_new_tokens=50, 
+                    max_new_tokens=256, 
                     do_sample=True, 
                     temperature=0.7
                 )
@@ -124,10 +124,11 @@ class Cherrypiocker(TrainerCallback):
                 output_ids = model.generate(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
-                    max_new_tokens=20,
+                    max_new_tokens=256,
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
-                    do_sample=False
+                    do_sample=False,
+                    enable_thinking = False
                 )
             
             prompt_text = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
