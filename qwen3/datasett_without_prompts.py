@@ -14,7 +14,8 @@ class QwenDataset(Dataset):
         self.tokenizer = AutoTokenizer.from_pretrained(
             model, 
             trust_remote_code=True, 
-            padding_side='right'
+            padding_side='right', 
+
         )
         self.tokenizer.pad_token = self.tokenizer.eos_token # ??
         
@@ -24,14 +25,6 @@ class QwenDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
-
-    def get_collator(self):
-        return DataCollatorForCausal_LM( # ?? ?
-            tokenizer=self.tokenizer,
-            padding=True,
-            label_pad_token_id=self.ignore_index
-        )
-
     @staticmethod
     def domain_retrieval(path_name: str):
         path_name = path_name.lower()
@@ -80,85 +73,97 @@ class QwenDataset(Dataset):
     def __getitem__(self, idx):
         row = self.data[idx]
         
-        # system_part = f"<|im_start|>system\n{self.system_instruction}<|im_end|>\n"
-        # user_content = f"Domain: {row['Domain']}\nText: {row['Text']}\nTarget: {row['Target']}"
-        # user_part = f"<|im_start|>user\n{user_content}<|im_end|>\n"
-        # assistant_header = "<|im_start|>assistant\n"
-        
-        {"ID": "11027:10_307", 
-        "Text": "С сервисом полный порядок.", 
-        "Quadruplet": [{"Aspect": "сервисом", 
-                        "Opinion": "полный порядок", 
-                        "Category": "SERVICE#GENERAL", 
-                        "VA": "7.5#7.3"
-                        }]
-        }
-        {"ID": "28612:0_1167", "Text": "Ресторан замечательный!", "Quadruplet": [{"Aspect": "Ресторан", "Opinion": "замечательный", "Category": "RESTAURANT#GENERAL", "VA": "7.8#7.4"}]}
-
-        # prompt_str = system_part + user_part + assistant_header
-
         system_content = self.system_instruction
 
-        user_content = f"Domain:{row['Domain']}\nText:{row['Text']}\nTarget:{row["Aspect"]}"
+        user_content = f"Domain:{row['Domain']}\nText:{row['Text']}\nTarget:{row['Aspect']}"
 
-        assistant_content  = f"assistant\n"
-        messages = [
-            {"role": "user", "content": user_content}, 
-            {"role" : "assistant" , "content" : assistant_content} , 
-            {"role" : "system" , "content" : system_content} 
+        assistant_content  = f"Valence:{row['Valence']}Arousal:{row['Arousal']}"
+
+        message = [
+            {"role" :  "system" , "content" : system_content}, 
+            {"role":   "user",    "content": user_content}, 
+            {"role" :  "assistant" , "content" : assistant_content} , 
+        ]
+        prompt_message = [ # we need it in order to block model from learning the questions 
+                {"role" :  "system" , "content" : system_content}, 
+                {"role":   "user",    "content": user_content}
         ]
 
-        # 2. Pass 'enable_thinking=False' as a keyword argument
-        text_input = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=False  # i think it is in kwargs 
-        )
-        if self.inference_mode:
-            encoding = self.tokenizer(
-                prompt_str,
+        if self.inference_mode: 
+            message = [
+                    {"role" : "system" , "content" : system_content},
+                    {"role": "user", "content": user_content}# here we use the content from test to generate?  
+                    ] 
+            # we need the tokenized prompt to generate 
+            prompt = self.tokenizer.apply_chat_template(
+                message, 
+                add_generation_prompt = True , 
+                tokenizer = False, 
+                enable_thinking = False
+            )
+
+            tokenized_prompt = self.tokenizer(
+                prompt,
                 truncation=True,
                 max_length=self.max_len,
-                padding=False,
+                padding=False, 
                 return_tensors="pt"
             )
+
             return {
-                "input_ids": encoding["input_ids"].squeeze(0),
-                "attention_mask": encoding["attention_mask"].squeeze(0)
+                "input_ids" :tokenized_prompt['input_ids'].squeeze(0), 
+                "attention_masks" : tokenized_prompt['attention_mask'].squeeze(0)
             }
 
-        # reasoning_text = row.get('Reasoning', "Analyzing sentiment...")
-        # response_str = f"<think>\n{reasoning_text}\n</think>\n{row['Valence']}#{row['Arousal']}<|im_end|>"
-        response_str = f"<think>\n\n</think>\n{row['Valence']}#{row['Arousal']}<|im_end|>"
-        full_str = prompt_str + response_str
-        
-        encoding = self.tokenizer(
-            full_str,
-            truncation=True,
-            max_length=self.max_len,
-            padding="max_length",
-            return_tensors="pt"
+        full_message_chat = self.tokenizer.apply_chat_template(
+            message ,
+            enable_thinking = False, 
+            add_generation_prompt = False , 
+            tokenize = False
         )
-        
-        input_ids = encoding["input_ids"].squeeze(0)
-        attention_mask = encoding["attention_mask"].squeeze(0)
+
+        prompt_message_chat = self.tokenizer.apply_chat_template(
+            prompt_message, 
+            enable_thinking = False, 
+            add_generation_prompt = True , 
+            tokenize = False
+        )
+
+        tokenized_full_message_chat  = self.tokenizer(
+            full_message_chat, 
+            truncation = True, 
+            max_length =self.max_len, 
+            padding = 'max_length',
+            return_tensors = 'pt'
+        )
+
+        attetion_mask = tokenized_full_message_chat['attention_mask'].squeeze(0)
+        input_ids = tokenized_full_message_chat['input_ids'].squeeze(0)
+
         labels = input_ids.clone()
 
-        prompt_enc = self.tokenizer(
-            prompt_str,
-            truncation=True,
-            max_length=self.max_len,
-            padding=False, 
-            return_tensors="pt"
+        tokenized_prompt_message_chat = self.tokenizer(
+            prompt_message_chat,
+            truncation = True, 
+            max_length =self.max_len, 
+            padding = 'max_length',
+            return_tensors = 'pt'
         )
-        prompt_len = prompt_enc["input_ids"].shape[1]
+        input_ids_prompt_len = len(tokenized_prompt_message_chat['input_ids'])
 
-        labels[:prompt_len] = self.ignore_index
-        labels[attention_mask == 0] = self.ignore_index
+        labels[:input_ids_prompt_len] = -100
+        
+        labels[attetion_mask == 0] = -100
 
         return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "labels": labels 
-        }
+                "input_ids": input_ids,
+                "attention_mask": attetion_mask,
+                "labels": labels
+            } 
+
+        
+
+
+        
+
+        
