@@ -13,12 +13,13 @@ from transformers import (
 )
 import bitsandbytes
 os.environ["TORCHDYNAMO_DISABLE"] = "1" 
-from datasett import QwenDataset
-import flash_attn
+from datasett_without_prompts import QwenDataset
+# import flash_attn
 # from basic_new_mseloss import CustomTrainer
 from helper import (
                     save_training_history,
-                    PrinterCallback
+                    PrinterCallback,
+                    Cherrypiocker
                  )
 # if we need some new model head 
 # from Twohead import TwoheadModel
@@ -116,14 +117,14 @@ def main():
                         num_train_epochs=args.epochs,             
                         
                         #Logging and Saving
-                        logging_steps=10,             
+                        logging_steps=20,             
                         save_strategy="steps",
-                        save_steps=300,
+                        save_steps=40,
                         
                         #Evaluation
                         # evaluation_strategy="no", 
                         eval_strategy= 'steps', 
-                        eval_steps = 75, 
+                        eval_steps = 20, 
                         load_best_model_at_end=True, # Save the best version, not the last version       
                         metric_for_best_model='loss',
                         #Optimizer
@@ -133,15 +134,18 @@ def main():
                     )
 
     # space_saver = SpaceSaverCallback()
-    prompt_text = 
-    printer = PrinterCallback(model = model,tokenizer = tokenizer, prompt_text = "Отдельно хочется отметить качество живой музыки!", "Quadruplet":"Aspect": "живой музыки", "Opinion": "хочется отметить качество", "Category": "AMBIENCE#GENERAL"")
+    sample_callback = Cherrypiocker(
+        tokenizer=tokenizer,
+        eval_dataset=eval_dataset,
+        num_samples=3
+    )
     trainer = Trainer(
                 model=model,
                 args=training_args,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset, 
                 data_collator = collator,
-                callbacks = [printer ,DefaultFlowCallback()]
+                callbacks = [sample_callback, DefaultFlowCallback()]
             )
 
     if args.resume_from_checkpoint:

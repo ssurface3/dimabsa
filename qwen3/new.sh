@@ -7,7 +7,7 @@ set -e
 
 # MODEL="Qwen/Qwen3-Embedding-8B"
 MODEL='Qwen/Qwen3-0.6B'
-BS=8
+BS=20
 ACCUM=4
 LR=1e-5
 EPOCHS=3
