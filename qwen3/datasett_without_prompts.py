@@ -68,12 +68,12 @@ class QwenDataset(Dataset):
                     
                     flattened_data.append({
                         'Domain': current_domain, 'Text': entry.get('Text'), 'Target': str(target),
-                        'Valence': val, 'Arousal': aro, 'Reasoning': reasoning
+                        'Valence': val, 'Arousal': aro , 'Aspect' : aspect 
                     })
             else:
                 flattened_data.append({
                     'Domain': current_domain, 'Text': entry.get('Text'), 'Target': "General",
-                    'Valence': 5.0, 'Arousal': 5.0, 'Reasoning': reasoning
+                    'Valence': 5.0, 'Arousal': 5.0 , 'Aspect' : aspect 
                 })
         return flattened_data 
 
@@ -85,12 +85,23 @@ class QwenDataset(Dataset):
         # user_part = f"<|im_start|>user\n{user_content}<|im_end|>\n"
         # assistant_header = "<|im_start|>assistant\n"
         
+        {"ID": "11027:10_307", 
+        "Text": "С сервисом полный порядок.", 
+        "Quadruplet": [{"Aspect": "сервисом", 
+                        "Opinion": "полный порядок", 
+                        "Category": "SERVICE#GENERAL", 
+                        "VA": "7.5#7.3"
+                        }]
+        }
+        {"ID": "28612:0_1167", "Text": "Ресторан замечательный!", "Quadruplet": [{"Aspect": "Ресторан", "Opinion": "замечательный", "Category": "RESTAURANT#GENERAL", "VA": "7.8#7.4"}]}
+
         # prompt_str = system_part + user_part + assistant_header
 
         system_content = self.system_instruction
 
-        user_content = f"Domain:{row['Domain']}\nText:{row['Text']}\nTarget:{row["Target"]}"
+        user_content = f"Domain:{row['Domain']}\nText:{row['Text']}\nTarget:{row["Aspect"]}"
 
+        assistant_content  = f"assistant\n"
         messages = [
             {"role": "user", "content": user_content}, 
             {"role" : "assistant" , "content" : assistant_content} , 
