@@ -124,13 +124,19 @@ class Cherrypiocker(TrainerCallback):
                 output_ids = model.generate(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
-                    max_new_tokens=256,
+                    max_new_tokens=128,
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
+                    temperature = 0.7,
                     do_sample=False,
                     enable_thinking = False
                 )
-            
+            input_len = inputs['input_ids'].shape[1]
+            new_tokens = generated_ids[0][input_len:]
+
+            print(f"DEBUG: Raw Input IDs: {inputs['input_ids'][0][-10:]}") 
+            print(f"DEBUG: Generated IDs: {new_tokens}")
+            print(f"DEBUG: EOS Token ID is: {tokenizer.eos_token_id}")
             prompt_text = self.tokenizer.decode(input_ids[0], skip_special_tokens=True)
             
             generated_text = self.tokenizer.decode(

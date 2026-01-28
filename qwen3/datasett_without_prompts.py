@@ -17,11 +17,11 @@ class QwenDataset(Dataset):
             padding_side='right', 
 
         )
-        self.tokenizer.pad_token = self.tokenizer.eos_token # ??
+        # self.tokenizer.pad_token = self.tokenizer.eos_token # ??
         
         if not system_instruction:
-            self.task = """Valence–Arousal (VA): Output two real-valued scores (1.00-9.00). An Aspect Term is a specific opinion target linked to an abstract Entity#Attribute Aspect Category and a sentiment-bearing Opinion Term, characterized by Valence-Arousal scores ranging from 1.00 (negative/low) to 9.00 (positive/high) that measure the degree of positivity and emotional intensity."""
-            self.system_instruction = self.task + "\nAnalyze the text and then output the Valence#Arousal scores."
+            
+            self.system_instruction = "Analyze the text. Rate Valence (positivity) and Arousal (intensity) on a scale of 1.00-9.00. Output format: Valence#Arousal."
 
     def __len__(self):
         return len(self.data)
