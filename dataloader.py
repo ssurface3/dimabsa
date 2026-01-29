@@ -25,25 +25,30 @@ class Dataloader(Dataset):
         elif isinstance(data_source, list):
             self.data = data_source
 
-    def domain_retrieval(self, path_name) -> None:
-        map_of_domains = {
-            "general",
-            "restaraunt", 
-            "laptop", 
-            "finance"
-        }
-        for domain in map_of_domains:
-            if "restaraunt" in path:
-                self.domain = domain
-            elif  "laptop" in path:
-                self.domain = domain
-            elif "finance" in path:
-                self.domain = domain
-            else:
-                self.domain = "general"
-                print('returned general,maybe there is a problem')
+    
     @staticmethod
     def _parse_jsonl(path, filter_lang=None):
+        def domain_retrieval(path_name) -> None:
+            map_of_domains = {
+                "general",
+                "restaraunt", 
+                "laptop", 
+                "finance"
+            }
+            for domain in map_of_domains:
+                if "restaraunt" in path:
+                    # self.domain = domain
+                    return "restaraunt"
+                elif  "laptop" in path:
+                    # self.domain = domain
+                    return "laptop"
+                elif "finance" in path:
+                    # self.domain = domain
+                    return "finance"
+                else:
+                    # self.domain = "general"
+                    return 'general'
+                    print('returned general,maybe there is a problem')
         flattened_data = []
         chinese_pattern = re.compile(r'[\u4e00-\u9fff]')
         cyrillic_pattern = re.compile(r'[\u0400-\u052F]') 
@@ -57,7 +62,7 @@ class Dataloader(Dataset):
             total_lines = 0
             
         with open(path, 'r', encoding='utf-8') as f:
-            self.domain_retrieval(path)
+            domain = domain_retrieval(path)
             for line in tqdm(f, total=total_lines, unit="lines"):
                 line = line.strip()
                 if not line: continue
@@ -94,7 +99,7 @@ class Dataloader(Dataset):
                         except ValueError:
                             val, aro = 5 , 5
                         # here is the domain in the way 'Domain: domain'
-                        text = "Domain:" + self.domain + text 
+                        text = "Domain:" + domain + 'Text:' + text 
 
                         flattened_data.append({
                             'ID': entry_id, 'Text': text, 'Target': str(target),
@@ -113,7 +118,7 @@ class Dataloader(Dataset):
                             clean_target = item_str[2:-2]
                         else:
                             clean_target = item_str
-                        text = "Domain:" + self.domain + text 
+                        text = "Domain:" + domain + 'Text:' + text 
                         flattened_data.append({
                             'ID': entry_id, 'Text': text, 'Target': clean_target,
                             'Valence': 5, 'Arousal': 5,
