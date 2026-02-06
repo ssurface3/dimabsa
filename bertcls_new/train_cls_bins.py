@@ -10,6 +10,7 @@ from transformers import (
     TrainingArguments,
     AutoConfig,
     AutoTokenizer,
+    AutoModel
 )
 from PreTrained_cls_64 import TwoHeadModel
 from custom_trainer_cls_custom_loss import CustomTrainer
@@ -93,10 +94,10 @@ def main():
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         eval_strategy="steps",
-        eval_steps=10, #placeholder for evaluation frequency to debug
+        eval_steps=30, #placeholder for evaluation frequency to debug
         save_strategy="epoch",
         save_total_limit=1,
-        logging_steps=10,
+        logging_steps=90,
         # load_best_model_at_end=True,
         greater_is_better=False,
         report_to="none", 
