@@ -10,54 +10,42 @@ def pearson_torch(preds, targets):
     denominator = torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2))
     return numerator / (denominator + 1e-8)
 def convert_to_cont(tensor):
-    """
-    :param tensor: non-converted bin values in the np.arange(1,32,1) to continous values in [1,9]
-    """
+
     pred_bin = torch.argmax(tensor, dim=1)
     pred_cont = (pred_bin.float()* 0.25) + 1.125
     return pred_cont
 def convert_to_bin(tensor):
-    """
-    :param tensor: continous value from 1 to 9 needed to be converted to np.arange(1,32,1)
-    """
+
     pred_bin = ((tensor - 1.125) / 0.25).long()
     return pred_bin.clamp(0, 31)
 
 def compute_metrics_bin(eval_pred):
-    #logits = [Toral_Samples , Output_dimensions]
-    # labels = [Total_samples , Label_dimension ]
+
     logits, labels = eval_pred
-    # else , it will cursh as the compute metrics 
+
     if isinstance(logits, np.ndarray):
         logits = torch.from_numpy(logits)
     if isinstance(labels, np.ndarray):
         labels = torch.from_numpy(labels)
 
-    # predictions are made in the bins ???
     pred_v = logits[:, :32] # imagine an array if 32 numbers : these numbers are probabilites of each bin happening 
     pred_a = logits[:, 32:]
-    # gold are in the way of the contin[1,9]
+
     gold_v = labels[:, 0] 
     gold_a = labels[:, 1]
 
-    """
-    Here ,i think we should punish not for the small fluctuations???
-    if yes , then we should convert gold values to bins , if not then we should convert the predictions into continous values 
-    """
-    #block prediction low fluctuation punishment bin to cont conversion
-    #all values are continous
     pred_cont_v = convert_to_cont(pred_v)
     pred_cont_a = convert_to_cont(pred_a)
-    
+
     pcc_v = pearson_torch(pred_cont_v, gold_v)
     pcc_a = pearson_torch(pred_cont_a, gold_a)
 
     sse_v = torch.sum((gold_v - pred_cont_v) ** 2)
     sse_a = torch.sum((gold_a - pred_cont_a) ** 2)
-    
+
     total_sse = sse_v + sse_a
     n_samples = gold_v.shape[0]
-    
+
     rmse_va = torch.sqrt(total_sse / n_samples) 
 
     continous_metrics =   {
@@ -65,7 +53,7 @@ def compute_metrics_bin(eval_pred):
         'PCC_A': pcc_a.item(),
         'RMSE_VA': rmse_va.item()
     }
-    #bin metrics 
+
     gold_bins_v = convert_to_bin(gold_v)
     gold_bins_a = convert_to_bin(gold_a)
     ev_bins_v , ev_bins_a = get_continuous_from_bins(pred_v).mean().item(), get_continuous_from_bins(pred_a).mean().item()
@@ -85,11 +73,11 @@ def get_continuous_from_bins(logits, num_bins=32, min_val=1.0, step=0.25):
 def check_bin_quality(logits, labels, name):
     pred_bins = torch.argmax(logits, dim=-1)
     bin_diff = torch.abs(pred_bins - labels).float()
-    
+
     mae_bins = torch.mean(bin_diff)
     within_1_bin = (bin_diff <= 1).float().mean()
     within_2_bins = (bin_diff <= 2).float().mean()
-    
+
     return {
         "bin_mae_" + name: mae_bins.item(),
         "acc_plus_minus_1_" + name: within_1_bin.item(),
@@ -115,9 +103,9 @@ class BinSanityCheck(TrainerCallback):
                     'input_ids': item['input_ids'].unsqueeze(0).to(device),
                     'attention_mask': item['attention_mask'].unsqueeze(0).to(device)
                 }
-                
+
                 outputs = model(**inputs)
-                
+
                 if isinstance(outputs, torch.Tensor):
                     logits_v = outputs[:, :32]
                     logits_a = outputs[:, 32:]
@@ -144,19 +132,14 @@ class BinSanityCheck(TrainerCallback):
         model.train()
 
 def save_training_history(trainer, args):
-    """
-    Saves the training logs to a CSV file.
-    It is now saved both in the global logs directory and the experiment info directory.
-    """
+
     history = trainer.state.log_history
     df = pd.DataFrame(history)
-    
-    # Global log
+
     os.makedirs("logs", exist_ok=True)
     global_filename = f"logs/{args.output_dir}.csv"
     df.to_csv(global_filename, index=False)
-    
-    # Experiment specific log
+
     exp_log_dir = os.path.join(f"./models/{args.output_dir}", "experiment_info")
     os.makedirs(exp_log_dir, exist_ok=True)
     exp_filename = os.path.join(exp_log_dir, "training_history.csv")
@@ -164,12 +147,10 @@ def save_training_history(trainer, args):
     print(f"Training history saved to {exp_filename}")
 
 def create_experiment_dir(output_dir, data, folder_name="experiment_info"):
-    """
-    Creates a directory inside output_dir and saves experiment data to a text file.
-    """
+
     target_dir = os.path.join(output_dir, folder_name)
     os.makedirs(target_dir, exist_ok=True)
-    
+
     file_path = os.path.join(target_dir, "experiment_data.txt")
     with open(file_path, "w") as f:
         if isinstance(data, dict):
@@ -177,6 +158,6 @@ def create_experiment_dir(output_dir, data, folder_name="experiment_info"):
                 f.write(f"{key}: {value}\n")
         else:
             f.write(str(data))
-    
+
     print(f"Experiment data saved to {file_path}")
     return target_dir

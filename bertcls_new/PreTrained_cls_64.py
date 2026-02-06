@@ -27,7 +27,7 @@ class TwoHeadModel(PreTrainedModel):
         }
         if token_type_ids is not None and hasattr(self.bert, "embeddings") and hasattr(self.bert.embeddings, "token_type_embeddings"):
              inputs["token_type_ids"] = token_type_ids
-             
+
         outputs = self.bert(**inputs)
         cls_output = outputs.last_hidden_state[: , 0  , :] # gets cls toekn
 
@@ -36,8 +36,4 @@ class TwoHeadModel(PreTrainedModel):
 
         logits = torch.cat((valence_logits, arousal_logits), dim=-1)
         return logits
-        # return {
-        #     "logits": logits, 
-        #     "valence_logits" : valence_logits
-        #     , "arousal_logits" : arousal_logits
-        #     }
+

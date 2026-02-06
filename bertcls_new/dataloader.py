@@ -30,7 +30,7 @@ class Dataloader(Dataset):
 
                 entry_id = entry.get('ID')
                 text = entry.get('Text')
-                
+
                 if 'Quadruplet' in entry:
                     for quad in entry['Quadruplet']:
                         aspect = quad.get('Aspect', 'NULL')
@@ -38,14 +38,12 @@ class Dataloader(Dataset):
                             target = quad.get('Category', 'general').replace("#", " ")
                         else:
                             target = aspect
-                        
+
                         try:
                             val, aro = map(float, quad.get('VA', '5.0#5.0').split('#'))
-                            # there is no need to guess the exact values as it is seriously peanlized 
-                            # however, we still need to distniguish between 5.15 and 5.25 however , they are almost identical 
+
                         except ValueError:
                             val, aro = 5, 5
-
 
                         flattened_data.append({
                             'ID': entry_id, 'Text': text, 'Target': str(target),
@@ -68,7 +66,7 @@ class Dataloader(Dataset):
                 elif 'Aspect' in entry:
                     raw_aspects = entry['Aspect']
                     if not isinstance(raw_aspects, list): raw_aspects = [raw_aspects]
-                    
+
                     for single_aspect in raw_aspects:
                         clean_target = str(single_aspect).replace("['", "").replace("']", "").replace("'", "").strip()
                         flattened_data.append({
@@ -80,9 +78,9 @@ class Dataloader(Dataset):
     @classmethod
     def prepare_splits(cls, file_path, tokenizer, max_len=128, test_size=0.1):
         full_data = cls._parse_jsonl(file_path)
-        
+
         train_list, val_list = train_test_split(full_data, test_size=test_size, random_state=42)
-        
+
         return cls(train_list, tokenizer, max_len), cls(val_list, tokenizer, max_len)
     def __len__(self):
         return len(self.data)
@@ -106,8 +104,8 @@ class Dataloader(Dataset):
             'attention_mask': encoding['attention_mask'].flatten(),
             'labels': torch.tensor([val, aro], dtype=torch.bfloat16)
         }
-        
+
         if 'token_type_ids' in encoding:
             output['token_type_ids'] = encoding['token_type_ids'].flatten()
-            
+
         return output

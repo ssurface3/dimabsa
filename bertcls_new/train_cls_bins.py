@@ -1,7 +1,6 @@
 import os    
 import shutil
 
-
 import argparse
 import torch
 
@@ -58,33 +57,23 @@ def main():
         args.model_name,
         num_labels=32, # two head with 32 bins each
     )
-    
-    
 
     try:
         print('Started loading the model and backbone...')
-        # 1. Initialize the structure (random weights)
+
         model = TwoHeadModel(config)
-        
-        # 2. Load the pretrained weights into the .bert attribute specifically
-        # This fixes the "weights not initialized" warning
+
         model.bert = AutoModel.from_pretrained(
             args.model_name,
             config=config,
             trust_remote_code=True
         )
         print("Pretrained backbone loaded successfully.")
-        
+
     except Exception as e:
         print(f"Loading failed: {e}")
-        # Fallback to standard classification model if custom fails
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_name,
-            config=config,
-            ignore_mismatched_sizes=True,
-            trust_remote_code=True 
-        )
-        
+        raise  ValueError("The error is likely due to the model not being compatible with the TwoHeadModel architecture. Please ensure that the pretrained model you are trying to load has a compatible architecture and that the 'bert' attribute in TwoHeadModel is correctly defined to accept the pretrained weights.")
+
     print("Model loaded.")
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
@@ -94,16 +83,16 @@ def main():
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         eval_strategy="steps",
-        eval_steps=30, #placeholder for evaluation frequency to debug
+        eval_steps=100, #placeholder for evaluation frequency to debug
         save_strategy="epoch",
         save_total_limit=1,
-        logging_steps=90,
-        # load_best_model_at_end=True,
+        logging_steps=40,
+
         greater_is_better=False,
         report_to="none", 
         fp16=torch.cuda.is_available(),
         remove_unused_columns=False,
-        warmup_ratio=0.05 
+        warmup_ratio=0.10 
     )
     eval_checker = BinSanityCheck(eval_dataset =eval_dataset,tokenizer= AutoTokenizer.from_pretrained(
         args.model_name, 
@@ -128,14 +117,13 @@ def main():
     final_path = f"./models/{args.output_dir}/final"
     trainer.save_model(final_path)    
     save_training_history(trainer, args)
-    
-    # Save experiment configuration including data info
+
     experiment_data = vars(args).copy()
     experiment_data["train_size"] = len(train_dataset)
     experiment_data["eval_size"] = len(eval_dataset)
-    
+
     create_experiment_dir(f"./models/{args.output_dir}", experiment_data)
-    
+
     for item in os.listdir(f"./models/{args.output_dir}"):
         if item.startswith("checkpoint-"):
             shutil.rmtree(os.path.join(f"./models/{args.output_dir}", item))
