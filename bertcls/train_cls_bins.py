@@ -18,7 +18,8 @@ from custom_trainer_cls import CustomTrainer
 from helper import (
                     #  SpaceSaverCallback , 
                     compute_metrics , 
-                    save_training_history 
+                    save_training_history,
+                    create_experiment_dir
                  )
 # from tqdm import tqdm 
 # from transformers import ProgressCallback
@@ -42,6 +43,7 @@ parser.add_argument("--lr", type=float, default=2e-5)
 parser.add_argument("--grad_accum", type=int, default=1)
 parser.add_argument("--resume_from_checkpoint", type=str, default=None)
 parser.add_argument("--max_len", type=int, default=50)
+parser.add_argument("--loss_type", type=str, default="CE", help="Label for the loss function used")
 args = parser.parse_args()
 
 def main():
@@ -119,6 +121,13 @@ def main():
     final_path = f"./models/{args.output_dir}/final"
     trainer.save_model(final_path)    
     save_training_history(trainer, args)
+    
+    # Save experiment configuration including data info
+    experiment_data = vars(args).copy()
+    experiment_data["train_size"] = len(train_dataset)
+    experiment_data["eval_size"] = len(eval_dataset)
+    
+    create_experiment_dir(f"./models/{args.output_dir}", experiment_data)
     
     for item in os.listdir(f"./models/{args.output_dir}"):
         if item.startswith("checkpoint-"):

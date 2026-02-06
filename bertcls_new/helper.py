@@ -96,7 +96,10 @@ def check_bin_quality(logits, labels, name):
         "acc_plus_minus_2_"+name: within_2_bins.item()
     }
 class BinSanityCheck(TrainerCallback):
-    def on_evaluate(self, args, state, control,model, tokenizer, eval_dataset, **kwargs):
+    def __init__(self, tokenizer , eval_dataset):
+        self.tokenizer = tokenizer
+        self.eval_dataset = eval_dataset
+    def on_evaluate(self, args, state, control,model, **kwargs):
         print("/n " +'=' * 50)
         print('Evaluation on first 5 samples from eval_dataset')
 
@@ -107,15 +110,19 @@ class BinSanityCheck(TrainerCallback):
 
         with torch.no_grad():
             for idx in indices:
-                item = eval_dataset[idx] # row
+                item = self.eval_dataset[idx] # row
                 inputs = {
                     'input_ids': item['input_ids'].unsqueeze(0).to(device),
                     'attention_mask': item['attention_mask'].unsqueeze(0).to(device)
                 }
                 
                 outputs = model(**inputs)
-
-                logits_v, logits_a = outputs
+                
+                if isinstance(outputs, torch.Tensor):
+                    logits_v = outputs[:, :32]
+                    logits_a = outputs[:, 32:]
+                else:
+                    logits_v, logits_a = outputs
 
                 pred_bin_v = torch.argmax(logits_v, dim=1).item()
                 pred_bin_a = torch.argmax(logits_a, dim=1).item()
@@ -128,16 +135,48 @@ class BinSanityCheck(TrainerCallback):
                 real_v = (real_bin_v * 0.25) + 1.125
                 real_a = (real_bin_a * 0.25) + 1.125
 
-                text = tokenizer.decode(item['input_ids'] , skip_special_tokens = True)
+                text = self.tokenizer.decode(item['input_ids'] , skip_special_tokens = True)
 
                 print(f"\nText: {text[:80]}...")
                 print(f"Real:  V={real_v:.2f} (Bin {real_bin_v}), A={real_a:.2f} (Bin {real_bin_a})")
                 print(f"Pred:  V={pred_v:.2f} (Bin {pred_bin_v}), A={pred_a:.2f} (Bin {pred_bin_a})")
         print("="*50 + "\n")
         model.train()
+
 def save_training_history(trainer, args):
-    os.makedirs("logs", exist_ok=True)
+    """
+    Saves the training logs to a CSV file.
+    It is now saved both in the global logs directory and the experiment info directory.
+    """
     history = trainer.state.log_history
     df = pd.DataFrame(history)
-    filename = f"logs/{args.output_dir}.csv"
-    df.to_csv(filename, index=False)
+    
+    # Global log
+    os.makedirs("logs", exist_ok=True)
+    global_filename = f"logs/{args.output_dir}.csv"
+    df.to_csv(global_filename, index=False)
+    
+    # Experiment specific log
+    exp_log_dir = os.path.join(f"./models/{args.output_dir}", "experiment_info")
+    os.makedirs(exp_log_dir, exist_ok=True)
+    exp_filename = os.path.join(exp_log_dir, "training_history.csv")
+    df.to_csv(exp_filename, index=False)
+    print(f"Training history saved to {exp_filename}")
+
+def create_experiment_dir(output_dir, data, folder_name="experiment_info"):
+    """
+    Creates a directory inside output_dir and saves experiment data to a text file.
+    """
+    target_dir = os.path.join(output_dir, folder_name)
+    os.makedirs(target_dir, exist_ok=True)
+    
+    file_path = os.path.join(target_dir, "experiment_data.txt")
+    with open(file_path, "w") as f:
+        if isinstance(data, dict):
+            for key, value in data.items():
+                f.write(f"{key}: {value}\n")
+        else:
+            f.write(str(data))
+    
+    print(f"Experiment data saved to {file_path}")
+    return target_dir

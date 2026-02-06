@@ -8,16 +8,18 @@ import torch
 from transformers import (
     AutoModelForSequenceClassification, 
     TrainingArguments,
-    AutoConfig
+    AutoConfig,
+    AutoTokenizer,
 )
+from PreTrained_cls_64 import TwoHeadModel
+from custom_trainer_cls_custom_loss import CustomTrainer
 from dataloader import Dataloader
-from bertcls.custom_trainer_normalized import CustomTrainer
 from helper import (
-                    compute_metrics , 
+                    compute_metrics_bin , 
                     BinSanityCheck, 
-                    save_training_history
+                    save_training_history,
+                    create_experiment_dir
                  )
-from Twohead import TwoheadModel
 
 try:
     import torch._dynamo as _dynamo
@@ -26,17 +28,18 @@ except Exception:
     pass
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name", type=str, default="bert-base-uncased")
+parser.add_argument("--model_name", type=str, default="jhu-clsp/mmbert-base")
 parser.add_argument("--train_data_path", type=str, default="data/train.jsonl")
 parser.add_argument("--eval_data_path", type=str, default="data/eval.jsonl")
 parser.add_argument("--test_data_path", type=str, default="data/eval.jsonl")
-parser.add_argument("--output_dir", type=str, required=True)
+parser.add_argument("--output_dir", type=str, required=True ,default = "/kaggle/working/dimabsa/paper_tests")
 parser.add_argument("--epochs", type=int, default=5)
 parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--lr", type=float, default=2e-5)
 parser.add_argument("--grad_accum", type=int, default=1)
 parser.add_argument("--resume_from_checkpoint", type=str, default=None)
 parser.add_argument("--max_len", type=int, default=50)
+parser.add_argument("--loss_type", type=str, default="CE", help="Label for the loss function used")
 args = parser.parse_args()
 
 def main():
@@ -53,25 +56,34 @@ def main():
     config = AutoConfig.from_pretrained(
         args.model_name,
         num_labels=32, # two head with 32 bins each
-        problem_type= 'single_label_classification'
     )
     
     
 
     try:
-        model = TwoheadModel.from_pretrained(
+        print('Started loading the model and backbone...')
+        # 1. Initialize the structure (random weights)
+        model = TwoHeadModel(config)
+        
+        # 2. Load the pretrained weights into the .bert attribute specifically
+        # This fixes the "weights not initialized" warning
+        model.bert = AutoModel.from_pretrained(
             args.model_name,
             config=config,
-            ignore_mismatched_sizes=True
+            trust_remote_code=True
         )
+        print("Pretrained backbone loaded successfully.")
+        
     except Exception as e:
-        print(f"Standard load failed: {e}")
+        print(f"Loading failed: {e}")
+        # Fallback to standard classification model if custom fails
         model = AutoModelForSequenceClassification.from_pretrained(
             args.model_name,
             config=config,
             ignore_mismatched_sizes=True,
             trust_remote_code=True 
         )
+        
     print("Model loaded.")
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
@@ -89,16 +101,20 @@ def main():
         greater_is_better=False,
         report_to="none", 
         fp16=torch.cuda.is_available(),
+        remove_unused_columns=False,
         warmup_ratio=0.05 
     )
-
+    eval_checker = BinSanityCheck(eval_dataset =eval_dataset,tokenizer= AutoTokenizer.from_pretrained(
+        args.model_name, 
+        use_fast = True
+    ))
     trainer = CustomTrainer(
                 model=model,
                 args=training_args,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
-                compute_metrics=compute_metrics,
-                callbacks=[BinSanityCheck()]
+                compute_metrics=compute_metrics_bin,
+                callbacks=[eval_checker]
             )
 
     if args.resume_from_checkpoint:
@@ -111,6 +127,13 @@ def main():
     final_path = f"./models/{args.output_dir}/final"
     trainer.save_model(final_path)    
     save_training_history(trainer, args)
+    
+    # Save experiment configuration including data info
+    experiment_data = vars(args).copy()
+    experiment_data["train_size"] = len(train_dataset)
+    experiment_data["eval_size"] = len(eval_dataset)
+    
+    create_experiment_dir(f"./models/{args.output_dir}", experiment_data)
     
     for item in os.listdir(f"./models/{args.output_dir}"):
         if item.startswith("checkpoint-"):

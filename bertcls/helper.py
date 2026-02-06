@@ -86,16 +86,39 @@ def save_training_history(trainer, args):
 def save_training_history(trainer, args):
     """
     Saves the training logs to a CSV file.
+    It is now saved both in the global logs directory and the experiment info directory.
     """
-    os.makedirs("logs", exist_ok=True)
-    
-
     history = trainer.state.log_history
     df = pd.DataFrame(history)
     
-
+    # Global log
+    os.makedirs("logs", exist_ok=True)
     clean_name = args.output_dir.replace("/", "_").replace(".", "")
-    filename = f"logs/history_{clean_name}.csv"
+    global_filename = f"logs/history_{clean_name}.csv"
+    df.to_csv(global_filename, index=False)
     
-    df.to_csv(filename, index=False)
+    # Experiment specific log
+    exp_log_dir = os.path.join(f"./models/{args.output_dir}", "experiment_info")
+    os.makedirs(exp_log_dir, exist_ok=True)
+    exp_filename = os.path.join(exp_log_dir, "training_history.csv")
+    df.to_csv(exp_filename, index=False)
+    print(f"Training history saved to {exp_filename}")
+
+def create_experiment_dir(output_dir, data, folder_name="experiment_info"):
+    """
+    Creates a directory inside output_dir and saves experiment data to a text file.
+    """
+    target_dir = os.path.join(output_dir, folder_name)
+    os.makedirs(target_dir, exist_ok=True)
+    
+    file_path = os.path.join(target_dir, "experiment_data.txt")
+    with open(file_path, "w") as f:
+        if isinstance(data, dict):
+            for key, value in data.items():
+                f.write(f"{key}: {value}\n")
+        else:
+            f.write(str(data))
+    
+    print(f"Experiment data saved to {file_path}")
+    return target_dir
     print(f"Training Logs saved to: {filename}")

@@ -10,7 +10,9 @@ BS=18
 ACCUM=4
 LR=1e-5
 EPOCHS=5 
-EXP_ID="jhu-clsp/mmBERT-base-finetuned-dimabsa-laptop-alltasks"
+LOSS_TYPE="CrossEntropy"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+EXP_ID="mmBERT-base-finetuned-${TIMESTAMP}"
 
 TRAIN_DATA="/kaggle/working/dimabsa/data_final/train_with_chinese.jsonl"
 EVAL_DATA="/kaggle/working/dimabsa/data_final/dev_with_chinese.jsonl"
@@ -32,7 +34,8 @@ python /kaggle/working/dimabsa/bertcls/train_cls_bins.py \
     --epochs $EPOCHS \
     --batch_size $BS \
     --grad_accum $ACCUM \
-    --lr $LR 
+    --lr $LR \
+    --loss_type "$LOSS_TYPE"
 
 echo "training is over"
 
