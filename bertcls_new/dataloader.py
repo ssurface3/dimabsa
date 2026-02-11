@@ -7,7 +7,8 @@ from tqdm import tqdm
 import numpy as np
 class Dataloader(Dataset):
     def __init__(self, data_source, model, max_len=128):
-        self.model = model
+        # self.model = model
+        self.model = 'jhu-clsp/mmBERT-base'
         self.max_len = max_len
         self.data = data_source
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -86,6 +87,7 @@ class Dataloader(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
+        print('deez nut')
         row = self.data[index]
         str(row['Target'])
         encoding = self.tokenizer(
