@@ -7,7 +7,8 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
 from dataloader import Dataloader
-
+from scipy.special import expit
+import numpy as np
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str, required=True)
 parser.add_argument("--test_data", type=str, default="data/test.jsonl")
@@ -15,20 +16,41 @@ parser.add_argument("--output_file", type=str, default="submission.json")
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--max_len", type=int, default=50)
 args = parser.parse_args()
+import torch
 
+def validate_io(batch, logits, tokenizer):
+    ids = batch["input_ids"]
+    v_size = tokenizer.vocab_size
+    if torch.any(ids >= v_size) or torch.any(ids < 0):
+        raise ValueError("Tokenizer index mismatch with model embeddings")
+
+    unk_token = tokenizer.unk_token
+    for i in range(ids.size(0)):
+        raw_tokens = tokenizer.convert_ids_to_tokens(ids[i])
+        if raw_tokens.count(unk_token) > (len(raw_tokens) * 0.7):
+            print(f"Input verification failed for index {i}: Too many unknown tokens")
+
+    if torch.any(torch.isnan(logits)):
+        raise ValueError("Logits contain NaN")
+
+    transformed_scores = (torch.sigmoid(logits) * 8.0) + 1.0
+    
+    if torch.any(transformed_scores < 1.0) or torch.any(transformed_scores > 9.0):
+        print(f"Output out of range: Min {transformed_scores.min()}, Max {transformed_scores.max()}")
+
+    return torch.clamp(transformed_scores, 1.0, 9.0)
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda")
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     model = AutoModelForSequenceClassification.from_pretrained(args.model_path)
     model.to(device)
     model.eval()
 
-    # Accept either a single file or a directory of test files
     files_to_process = []
     if args.test_data and os.path.isdir(args.test_data):
         for p in sorted(os.listdir(args.test_data)):
-            if p.lower().endswith('.jsonl') and 'dev' in p.lower():
+            if p.lower().endswith('.jsonl') and 'test_task1' in p.lower():
                 files_to_process.append(os.path.join(args.test_data, p))
     elif args.test_data:
         files_to_process = [args.test_data]
@@ -48,10 +70,17 @@ def main():
         results = []
 
         with torch.no_grad():
-            for batch in tqdm(loader, desc=f"Inferring {os.path.basename(file_path)}"):
+            for i, batch in enumerate(tqdm(loader, desc=f"Inferring {os.path.basename(file_path)}")):
+                if i == 0:
+                    print("\n--- FIRST BATCH INFO ---")
+                    print("Keys:", batch.keys())
+                    print("Input IDs shape:", batch['input_ids'].shape)
+                    print("First example input_ids:", batch['input_ids'][0])
+                    # print("Tokens:", dataset.tokenizer.convert_ids_to_tokens(batch['input_ids'][0]))
+                    print("------------------------\n")
+
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
-                token_type_ids = batch.get('token_type_ids', None)
 
                 if token_type_ids is not None:
                     token_type_ids = token_type_ids.to(device)
@@ -67,12 +96,22 @@ def main():
         n = min(len(results), len(raw_data))
 
         submission_map = {}
-        csv_data = []
+    
 
         for i in range(n):
             row = raw_data[i]
-            val_pred = float(results[i][0])
-            aro_pred = float(results[i][1])
+            
+            val_logit = float(results[i][0])
+            aro_logit = float(results[i][1])
+            
+            val_prob = expit(val_logit)
+            aro_prob = expit(aro_logit)
+            
+            val_pred = (val_prob * 8.0) + 1.0
+            aro_pred = (aro_prob * 8.0) + 1.0
+            
+            val_pred = np.clip(val_pred, 1.00, 9.00)
+            aro_pred = np.clip(aro_pred, 1.00, 9.00)
 
             val_str = f"{val_pred:.2f}"
             aro_str = f"{aro_pred:.2f}"
@@ -91,12 +130,7 @@ def main():
                 "VA": f"{val_str}#{aro_str}"
             })
 
-            csv_data.append({
-                "ID": doc_id,
-                "Target": target,
-                "Valence": val_pred,
-                "Arousal": aro_pred
-            })
+            
 
         final_json = list(submission_map.values())
 
@@ -104,9 +138,10 @@ def main():
         if os.path.isdir(args.test_data):
             base = os.path.splitext(os.path.basename(file_path))[0]
             model_tag = os.path.basename(args.model_path).replace('/', '-')
-            out_json = os.path.join(os.path.dirname(args.output_file) or '.', f"{model_tag}_{base}.jsonl")
+            out_json = os.path.join(os.path.dirname(args.output_file) or '.', f"{model_tag}_{base}.json")
 
         with open(out_json, 'w', encoding='utf-8') as f:
-            json.dump(final_json, f, indent=4, ensure_ascii=False)
+            for entry in final_json:
+                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
 if __name__ == "__main__":
     main()

@@ -18,6 +18,8 @@ class Dataloader(Dataset):
 
     @staticmethod
     def _parse_jsonl(path):
+        import sys
+        print(f"DEBUG: Parsing file {path}", file=sys.stderr)
         flattened_data = []
         with open(path, 'r', encoding='utf-8') as fh:
             total_lines = sum(1 for _ in fh)
@@ -28,6 +30,10 @@ class Dataloader(Dataset):
                 if not line:
                     continue
                 entry = json.loads(line)
+
+                # Debug
+                if len(flattened_data) == 0:
+                     print(f"DEBUG: Entry keys: {list(entry.keys())}", file=sys.stderr)
 
                 entry_id = entry.get('ID')
                 text = entry.get('Text')
