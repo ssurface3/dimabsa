@@ -6,14 +6,14 @@ from transformers import AutoTokenizer
 from tqdm import tqdm 
 
 class Dataloader(Dataset):
-    def __init__(self, data_source, model, max_len=128):
-        self.model = model
+    def __init__(self, data_source, model_name, max_len=128):
         self.max_len = max_len
         self.data = data_source
+        self.model_name = 'jhu-clsp/mmBERT-base'
         self.tokenizer = AutoTokenizer.from_pretrained(
-                    self.model, 
-                    use_fast=True  
-                )
+            model_name, 
+            use_fast=True  
+        )
 
     @staticmethod
     def _parse_jsonl(path):
@@ -29,52 +29,63 @@ class Dataloader(Dataset):
                 entry = json.loads(line)
 
                 entry_id = entry.get('ID')
-                text = entry.get('Text')
+                text = entry.get('Text') or entry.get('Sentence') or ""
                 
+                quads = []
                 if 'Quadruplet' in entry:
-                    for quad in entry['Quadruplet']:
+                    quads = entry['Quadruplet']
+                elif 'Aspect_VA' in entry:
+                    quads = entry['Aspect_VA']
+                
+                if quads:
+                    for quad in quads:
                         aspect = quad.get('Aspect', 'NULL')
                         if aspect == "NULL":
-                            target = quad.get('Category', 'general').replace("#", " ")
+                            raw_cat = quad.get('Category', 'general')
+                            target = raw_cat.replace("#", " ")
                         else:
                             target = aspect
                         
+                        va_string = quad.get('VA', '5.0#5.0')
                         try:
-                            val, aro = map(float, quad.get('VA', '5.0#5.0').split('#'))
+                            val, aro = map(float, va_string.split('#'))
                         except ValueError:
                             val, aro = 5.0, 5.0
 
                         flattened_data.append({
-                            'ID': entry_id, 'Text': text, 'Target': str(target),
-                            'Valence': val, 'Arousal': aro
+                            'ID': entry_id, 
+                            'Text': text, 
+                            'Target': str(target),
+                            'Valence': val, 
+                            'Arousal': aro
                         })
 
                 elif 'Aspect' in entry:
                     raw_aspects = entry['Aspect']
-                    if not isinstance(raw_aspects, list): raw_aspects = [raw_aspects]
+                    if not isinstance(raw_aspects, list): 
+                        raw_aspects = [raw_aspects]
                     
                     for single_aspect in raw_aspects:
-                        clean_target = str(single_aspect).replace("['", "").replace("']", "").replace("'", "").strip()
+                        item_str = str(single_aspect).strip()
+                        if item_str.startswith("['") and item_str.endswith("']"):
+                            clean_target = item_str[2:-2]
+                        else:
+                            clean_target = item_str.replace("['", "").replace("']", "").replace("'", "").strip()
+                        
                         flattened_data.append({
-                            'ID': entry_id, 'Text': text, 'Target': clean_target,
-                            'Valence': 5.0, 'Arousal': 5.0
+                            'ID': entry_id, 
+                            'Text': text, 
+                            'Target': clean_target,
+                            'Valence': 5.0, 
+                            'Arousal': 5.0
                         })
         return flattened_data
-
-    @classmethod
-    def prepare_splits(cls, file_path, tokenizer, max_len=128, test_size=0.1):
-        full_data = cls._parse_jsonl(file_path)
-        
-        train_list, val_list = train_test_split(full_data, test_size=test_size, random_state=42)
-        
-        return cls(train_list, tokenizer, max_len), cls(val_list, tokenizer, max_len)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         row = self.data[index]
-        
         encoding = self.tokenizer(
             str(row['Text']),
             str(row['Target']),
@@ -84,13 +95,8 @@ class Dataloader(Dataset):
             return_tensors='pt'
         )
 
-        output = {
+        return {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
             'labels': torch.tensor([row['Valence'], row['Arousal']], dtype=torch.float)
         }
-        
-        if 'token_type_ids' in encoding:
-            output['token_type_ids'] = encoding['token_type_ids'].flatten()
-            
-        return output

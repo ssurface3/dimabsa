@@ -1,18 +1,6 @@
 import os    
 import shutil
-# kill errors!!
-logging.getLogger("transformers").setLevel(logging.ERROR)
-logging.getLogger("torch").setLevel(logging.ERROR)
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["GRPC_VERBOSITY"] = "ERROR"
-os.environ["GLOG_minloglevel"] = "3"
-
-stderr_backup = sys.stderr
-sys.stderr = open(os.devnull, "w")
-
-
-
+import logging
 import argparse
 import torch
 import warnings
@@ -23,7 +11,7 @@ from transformers import (
     AutoTokenizer
 )
 from dataloader import Dataloader
-from dimabsa/custom_trainer_mse import CustomTrainer
+from custom_trainer_mse import CustomTrainer
 from helper import SpaceSaverCallback , compute_metrics , save_training_history 
 from tqdm import tqdm 
 from transformers import ProgressCallback
@@ -67,6 +55,7 @@ def main():
         args.model_name, 
         num_labels=2, 
         problem_type="regression",
+        use_safetensors=False,
     )
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
@@ -82,7 +71,7 @@ def main():
         save_total_limit=1,
         logging_steps=100,
         load_best_model_at_end=True,
-        metric_for_best_model="RMSE_VA",
+        metric_for_best_model="eval_loss",
         greater_is_better=False,
         report_to="none", 
         fp16=torch.cuda.is_available(),
@@ -96,7 +85,6 @@ def main():
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
                 compute_metrics=compute_metrics,
-                callbacks=[space_saver,ProgressCallback()]
             )
 
     if args.resume_from_checkpoint:
