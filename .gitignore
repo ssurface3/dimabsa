@@ -9,3 +9,36 @@ __pycache__/custom_trainer.cpython-312.pyc
 __pycache__/dataloader.cpython-312.pyc
 __pycache__/helper.cpython-312.pyc
 logs/deberta_v3_large_new_loss.csv
+test_models/__pycache__/dataloader.cpython-312.pyc
+test_models/__pycache__/logger.cpython-312.pyc
+test_models/predictions/checkpoint-2520/checkpoint-2520_eng_laptop_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_eng_restaurant_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_jpn_finance_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_jpn_hotel_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_rus_restaurant_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_tat_restaurant_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_ukr_restaurant_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_zho_finance_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_zho_laptop_test_task1.json
+test_models/predictions/checkpoint-2520/checkpoint-2520_zho_restaurant_test_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_eng_laptop_dev_task1 (2).json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_eng_laptop_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_eng_restaurant_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_eng_restaurant_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_jpn_finance_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_jpn_finance_train_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_jpn_hotel_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_jpn_hotel_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_rus_restaurant_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_rus_restaurant_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_tat_restaurant_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_tat_restaurant_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_ukr_restaurant_dev_task1 (1).json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_ukr_restaurant_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_zho_finance_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_zho_finance_train_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_zho_laptop_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_zho_laptop_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_zho_restaurant_dev_task1.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/dimabsa-2026-subtask1-private-mmbert-alldata_last_zho_restaurant_train_alltasks.json
+test_models/predictions/dimabsa-2026-subtask1-private-mmbert-alldata_last/stats/ssurface/dimabsa-2026-subtask1-private-mmbert-alldata_last/metrics.csv
