@@ -40,6 +40,9 @@ def compute_metrics(eval_pred):
 
     pred_v = logits[:, 0]
     pred_a = logits[:, 1]
+
+    pred_v = (torch.sigmoid(pred_v) * 8.0) + 1.0
+    pred_a = (torch.sigmoid(pred_a) * 8.0) + 1.0
     
     gold_v = labels[:, 0]
     gold_a = labels[:, 1]

@@ -38,7 +38,7 @@ except Exception:
     pass
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name", type=str, default="bert-base-uncased")
+parser.add_argument("--model_name", type=str, default="jhu-clsp/mmBERT-base")
 parser.add_argument("--train_data_path", type=str, default="data/train.jsonl")
 parser.add_argument("--eval_data_path", type=str, default="data/eval.jsonl")
 parser.add_argument("--test_data_path", type=str, default="data/eval.jsonl")
@@ -68,24 +68,6 @@ def main():
         num_labels=2, 
         problem_type="regression",
     )
-    print("Model loaded.")
-    # training_args = TrainingArguments(
-    #     output_dir=f"./models/{args.output_dir}",
-    #     num_train_epochs=args.epochs,
-    #     per_device_train_batch_size=args.batch_size,
-    #     per_device_eval_batch_size=args.batch_size,
-    #     gradient_accumulation_steps=args.grad_accum,
-    #     learning_rate=args.lr,
-    #     eval_strategy="epoch",
-    #     save_strategy="epoch",
-    #     save_total_limit=1,
-    #     load_best_model_at_end=True,
-    #     greater_is_better=False,
-    #     report_to="none", 
-    #     fp16=torch.cuda.is_available(),
-    #     warmup_ratio=0.05 # added warmup ratio 
-    # )
-
     training_args = TrainingArguments(
         output_dir=f"./models/{args.output_dir}",
         num_train_epochs=args.epochs,
@@ -94,15 +76,17 @@ def main():
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         eval_strategy="steps",
-        eval_steps=50,
-        save_strategy="epoch",
+        eval_steps=360, # approx 4 times per epoch for 23k data size
+        save_strategy="steps",
+        save_steps=360,
         save_total_limit=1,
-        logging_steps=10,
-        # load_best_model_at_end=True,
+        logging_steps=100,
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
         greater_is_better=False,
         report_to="none", 
         fp16=torch.cuda.is_available(),
-        warmup_ratio=0.05 # added warmup ratio 
+        warmup_ratio=0.05 
     )
 
     space_saver = SpaceSaverCallback()

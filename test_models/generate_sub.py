@@ -49,7 +49,7 @@ def main():
     files_to_process = []
     if args.test_data and os.path.isdir(args.test_data):
         for p in sorted(os.listdir(args.test_data)):
-            if p.lower().endswith('.jsonl') and 'test_task1' in p.lower():
+            if p.lower().endswith('.jsonl') and ( 'test_task1' in p.lower() or 'dev_task1' in p.lower() or 'marked' in p.lower() or "train_alltasks" in p.lower() or "train_task1" in p.lower()):
                 files_to_process.append(os.path.join(args.test_data, p))
     elif args.test_data:
         files_to_process = [args.test_data]
