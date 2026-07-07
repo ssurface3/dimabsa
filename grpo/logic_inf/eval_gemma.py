@@ -73,14 +73,38 @@ def _patch_peft_for_gemma4():
 
 _patch_peft_for_gemma4()
 
+
+def _base_from_adapter_config(adapter_path: str) -> str:
+    """Read base_model_name_or_path from the adapter's config so we always
+    load the exact model architecture the adapter was trained on."""
+    cfg = os.path.join(adapter_path, "adapter_config.json")
+    if not os.path.exists(cfg):
+        return ""
+    with open(cfg) as f:
+        d = json.load(f)
+    return d.get("base_model_name_or_path", "")
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--model",       required=True,  help="Base model name or path")
+parser.add_argument("--model",       default="",     help="Base model name/path (auto-detected from adapter_config if omitted)")
 parser.add_argument("--sft_adapter", default="",     help="SFT adapter path (merged before GRPO adapter)")
 parser.add_argument("--adapter",     default="",     help="GRPO adapter path (or SFT adapter for sft-only eval)")
 parser.add_argument("--level",       required=True,  help="e.g. 'level 4'")
 parser.add_argument("--output",      default="",     help="Path to save JSON results")
 parser.add_argument("--batch_size",  type=int, default=8)
 args = parser.parse_args()
+
+# Auto-detect base model from adapter config — avoids shape mismatch when the
+# model ID drifts between training and eval.
+_detected = _base_from_adapter_config(args.sft_adapter or args.adapter)
+if _detected and args.model and _detected != args.model:
+    print(f"[WARN] --model {args.model} differs from adapter's base ({_detected}).")
+    print(f"[WARN] Using adapter's base model to avoid shape mismatch.")
+    args.model = _detected
+elif _detected and not args.model:
+    args.model = _detected
+if not args.model:
+    raise ValueError("Cannot determine base model: pass --model or provide a valid adapter path.")
 
 _NUM_RE = re.compile(r"[\d\.,]+")
 
