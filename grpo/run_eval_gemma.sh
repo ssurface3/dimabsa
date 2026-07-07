@@ -59,6 +59,24 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 LEVEL_NAMES=([1]="level 1" [2]="level 2" [3]="level 3" [4]="level 4" [5]="level 5")
 
+# Resolve adapter path: prefer final_adapter/, fall back to latest checkpoint-N/ dir.
+# Prints the resolved path, or empty string if nothing found.
+resolve_adapter() {
+  local root="$1"
+  if [ -d "$root/final_adapter" ]; then
+    echo "$root/final_adapter"
+    return
+  fi
+  # Find the highest-numbered checkpoint dir
+  local latest
+  latest=$(ls -d "$root"/checkpoint-* 2>/dev/null | sort -t- -k2 -n | tail -1)
+  if [ -d "$latest" ]; then
+    echo "$latest"
+    return
+  fi
+  echo ""
+}
+
 case "$SOURCE" in
   gemma_sft)
     RESULTS_DIR="$PROJECT_DIR/eval_results_gemma_sft"
@@ -81,21 +99,22 @@ echo ""
 for L in "${LEVELS[@]}"; do
   LEVEL_STR="${LEVEL_NAMES[$L]}"
   OUTPUT="$RESULTS_DIR/l${L}.json"
-  SFT_ADAPTER="$SFT_CKPT_ROOT/level_${L}/final_adapter"
-  GRPO_ADAPTER="$GRPO_CKPT_ROOT/level_${L}/final_adapter"
 
   if [ -f "$OUTPUT" ]; then
     log "SKIP l${L} — results exist at $OUTPUT (delete to rerun)"
     continue
   fi
 
+  SFT_ADAPTER=$(resolve_adapter "$SFT_CKPT_ROOT/level_${L}")
+  GRPO_ADAPTER=$(resolve_adapter "$GRPO_CKPT_ROOT/level_${L}")
+
   case "$SOURCE" in
     gemma_sft)
-      if [ ! -d "$SFT_ADAPTER" ]; then
-        log "SKIP l${L} — SFT adapter not found: $SFT_ADAPTER"
+      if [ -z "$SFT_ADAPTER" ]; then
+        log "SKIP l${L} — no SFT adapter in $SFT_CKPT_ROOT/level_${L}/"
         continue
       fi
-      log "Evaluating gemma_sft l${L}..."
+      log "Evaluating gemma_sft l${L} (adapter: $(basename $SFT_ADAPTER))..."
       python3 logic_inf/eval_gemma.py \
         --model   "$BASE_GEMMA" \
         --adapter "$SFT_ADAPTER" \
@@ -105,15 +124,15 @@ for L in "${LEVELS[@]}"; do
       ;;
 
     gemma_grpo)
-      if [ ! -d "$SFT_ADAPTER" ]; then
-        log "SKIP l${L} — SFT adapter not found: $SFT_ADAPTER"
+      if [ -z "$SFT_ADAPTER" ]; then
+        log "SKIP l${L} — no SFT adapter in $SFT_CKPT_ROOT/level_${L}/"
         continue
       fi
-      if [ ! -d "$GRPO_ADAPTER" ]; then
-        log "SKIP l${L} — GRPO adapter not found: $GRPO_ADAPTER"
+      if [ -z "$GRPO_ADAPTER" ]; then
+        log "SKIP l${L} — no GRPO adapter in $GRPO_CKPT_ROOT/level_${L}/"
         continue
       fi
-      log "Evaluating gemma_grpo l${L}..."
+      log "Evaluating gemma_grpo l${L} (grpo: $(basename $GRPO_ADAPTER))..."
       python3 logic_inf/eval_gemma.py \
         --model       "$BASE_GEMMA" \
         --sft_adapter "$SFT_ADAPTER" \
