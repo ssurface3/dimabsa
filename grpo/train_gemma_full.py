@@ -87,6 +87,7 @@ GEMMA_CHAT_TEMPLATE = (
     "{% for message in messages %}"
     "{% if message['role'] == 'user' %}"
     "<start_of_turn>user\n{{ message['content'] | trim }}<end_of_turn>\n<start_of_turn>model\n"
+    "{% if loop.last and add_generation_prompt %}<think>\n{% endif %}"
     "{% elif message['role'] == 'assistant' %}"
     "{{ message['content'] | trim }}<end_of_turn>\n"
     "{% endif %}"
@@ -225,15 +226,28 @@ def goldilocks_reward(completions, level, **kwargs):
     return rewards
 
 
+def _think_chars(content: str) -> int:
+    """Extract think-block character count.
+    Handles both full <think>...</think> and completion-only mode where <think>
+    was forced in the prompt and the completion starts from inside the block."""
+    m = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
+    if m:
+        return len(m.group(1))
+    m2 = re.search(r"^(.*?)</think>", content, re.DOTALL)
+    return len(m2.group(1)) if m2 else 0
+
+
 def format_reward(completions, **kwargs):
     rewards = []
     for completion in completions:
         content    = completion[0]["content"]
-        has_think  = bool(re.search(r"<think>.*?</think>", content, re.DOTALL)) or \
-                     bool(re.search(r"</think>", content))
+        # Require non-trivial think content (>10 chars) — blocks the empty-block exploit.
+        # Works whether <think> is in the prompt (completion-only mode) or not.
+        has_think  = _think_chars(content) > 10
         has_answer = bool(re.search(r"###?#?\s*[\d\.,]+", content))
+        n_answers  = len(re.findall(r"###?#?\s*[\d\.,]+", content))
         if has_think and has_answer:
-            rewards.append(1.0)
+            rewards.append(-3.0 if n_answers > 2 else 1.0)   # punish answer-loop
         elif has_answer and not has_think:
             rewards.append(-3.0)
         elif has_think and not has_answer:
@@ -275,8 +289,7 @@ def length_reward(completions, level, ground_truth, **kwargs):
         match_ans  = re.search(r"###?#?\s*([\d\.,]+)", content)
         predicted  = match_ans.group(1).replace(",", "") if match_ans else ""
         correct    = (predicted == str(gt).strip())
-        m          = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
-        think_chars = len(m.group(1)) if m else 0
+        think_chars  = _think_chars(content)
         min_t, max_t = _LENGTH_TARGETS.get(str(lvl).lower().strip(), (15, 100))
         if think_chars < 5:
             penalty = -3.0
@@ -309,8 +322,7 @@ def sft_length_reward(completions, cot_chars=None, level=None, **kwargs):
     rewards = []
     for completion, target in zip(completions, cot_chars):
         content     = completion[0]["content"]
-        m           = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
-        think_chars = len(m.group(1)) if m else len(content)
+        think_chars = _think_chars(content)
         excess      = max(0, think_chars - int(target))
         rewards.append(-(math.exp(excess / SCALE) - 1.0) if excess > 0 else 0.0)
     return rewards

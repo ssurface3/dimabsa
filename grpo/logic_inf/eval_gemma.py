@@ -26,6 +26,7 @@ GEMMA_CHAT_TEMPLATE = (
     "{% for message in messages %}"
     "{% if message['role'] == 'user' %}"
     "<start_of_turn>user\n{{ message['content'] | trim }}<end_of_turn>\n<start_of_turn>model\n"
+    "{% if loop.last and add_generation_prompt %}<think>\n{% endif %}"
     "{% elif message['role'] == 'assistant' %}"
     "{{ message['content'] | trim }}<end_of_turn>\n"
     "{% endif %}"
@@ -236,15 +237,15 @@ def main():
                 correct += 1
             total += 1
 
-            think_tokens = 0
-            think_chars  = 0
-            think_match  = re.search(r"<think>(.*?)</think>", response, re.DOTALL)
-            if think_match:
-                think_content = think_match.group(1)
-                think_tokens  = len(tokenizer.encode(think_content, add_special_tokens=False))
-                think_chars   = len(think_content)
-                total_think_tokens += think_tokens
-                total_think_chars  += think_chars
+            # <think> is forced in the prompt; response starts from inside the block.
+            # Handle both full <think>...</think> and completion-only </think>.
+            m_full = re.search(r"<think>(.*?)</think>", response, re.DOTALL)
+            m_tail = re.search(r"^(.*?)</think>", response, re.DOTALL)
+            think_content = m_full.group(1) if m_full else (m_tail.group(1) if m_tail else "")
+            think_tokens  = len(tokenizer.encode(think_content, add_special_tokens=False)) if think_content else 0
+            think_chars   = len(think_content)
+            total_think_tokens += think_tokens
+            total_think_chars  += think_chars
 
             examples.append({
                 "question":     batch_questions[j],
