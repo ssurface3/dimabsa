@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemma vs Qwen — Reasoning Traces Across 4 Evals</title>
+<style>
+:root {
+  --bg:        #F1F0EC;
+  --bg-card:   #FAFAF8;
+  --bg-code:   #EDECE8;
+  --text:      #1A1917;
+  --text-2:    #6A6760;
+  --border:    #DEDAD4;
+  --rule:      #C9C5BE;
+  --sft1:      #2E5F99;
+  --sft2:      #2E7A52;
+  --grpo:      #8A5220;
+  --qwen:      #6B3B99;
+  --sft1-bg:   #EAF0F8;
+  --sft2-bg:   #E8F5EE;
+  --grpo-bg:   #F7EFE5;
+  --qwen-bg:   #F2EAF8;
+  --ok:        #1F7A3D;
+  --ok-bg:     #E3F5EA;
+  --bad:       #A0291A;
+  --bad-bg:    #FDEAE7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#141312;--bg-card:#1C1B18;--bg-code:#222120;--text:#E4E1DA;--text-2:#8A8780;
+    --border:#2D2C28;--rule:#3A3835;
+    --sft1:#6A9FD8;--sft2:#5BB582;--grpo:#D48040;--qwen:#AA70D8;
+    --sft1-bg:#1A2535;--sft2-bg:#182A21;--grpo-bg:#2A1E10;--qwen-bg:#201530;
+    --ok:#4DBB70;--ok-bg:#142A1E;--bad:#E0604A;--bad-bg:#2A1212;
+  }
+}
+:root[data-theme="light"] {
+  --bg:#F1F0EC;--bg-card:#FAFAF8;--bg-code:#EDECE8;--text:#1A1917;--text-2:#6A6760;
+  --border:#DEDAD4;--rule:#C9C5BE;
+  --sft1:#2E5F99;--sft2:#2E7A52;--grpo:#8A5220;--qwen:#6B3B99;
+  --sft1-bg:#EAF0F8;--sft2-bg:#E8F5EE;--grpo-bg:#F7EFE5;--qwen-bg:#F2EAF8;
+  --ok:#1F7A3D;--ok-bg:#E3F5EA;--bad:#A0291A;--bad-bg:#FDEAE7;
+}
+:root[data-theme="dark"] {
+  --bg:#141312;--bg-card:#1C1B18;--bg-code:#222120;--text:#E4E1DA;--text-2:#8A8780;
+  --border:#2D2C28;--rule:#3A3835;
+  --sft1:#6A9FD8;--sft2:#5BB582;--grpo:#D48040;--qwen:#AA70D8;
+  --sft1-bg:#1A2535;--sft2-bg:#182A21;--grpo-bg:#2A1E10;--qwen-bg:#201530;
+  --ok:#4DBB70;--ok-bg:#142A1E;--bad:#E0604A;--bad-bg:#2A1212;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body {
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:14px;line-height:1.6;padding:40px 20px 80px;
+}
+.page{max-width:900px;margin:0 auto;}
+.hdr{margin-bottom:32px;}
+.hdr-eye{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);margin-bottom:6px;}
+.hdr h1{font-size:1.55rem;font-weight:700;line-height:1.2;}
+.hdr p{color:var(--text-2);margin-top:8px;font-size:13px;max-width:60ch;}
+.summary-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:36px;}
+.ss-cell{background:var(--bg-card);padding:14px 16px;border-top:3px solid transparent;}
+.ss-cell.c-sft1{border-top-color:var(--sft1);}
+.ss-cell.c-sft2{border-top-color:var(--sft2);}
+.ss-cell.c-grpo{border-top-color:var(--grpo);}
+.ss-cell.c-qwen{border-top-color:var(--qwen);}
+.ss-name{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);margin-bottom:2px;}
+.ss-acc{font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;}
+.ss-cell.c-sft1 .ss-acc{color:var(--sft1);}
+.ss-cell.c-sft2 .ss-acc{color:var(--sft2);}
+.ss-cell.c-grpo .ss-acc{color:var(--grpo);}
+.ss-cell.c-qwen .ss-acc{color:var(--qwen);}
+.ss-sub{font-size:11px;color:var(--text-2);margin-top:2px;font-variant-numeric:tabular-nums;}
+.legend{display:flex;gap:20px;margin-bottom:24px;flex-wrap:wrap;}
+.leg-item{display:flex;align-items:center;gap:6px;}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.leg-label{font-size:12px;color:var(--text-2);}
+.example{margin-bottom:28px;}
+.ex-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;}
+.ex-num{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text-2);text-transform:uppercase;margin-top:2px;flex-shrink:0;}
+.ex-q{font-size:13.5px;line-height:1.5;color:var(--text);flex:1;}
+.gold-badge{font-size:11px;font-weight:700;background:var(--bg-code);color:var(--text-2);padding:2px 8px;border-radius:10px;flex-shrink:0;margin-top:2px;font-variant-numeric:tabular-nums;}
+.tok-compare{display:flex;flex-direction:column;gap:5px;margin-top:10px;padding:12px 14px;background:var(--bg-code);border-radius:4px;}
+.tc-title{font-size:11px;color:var(--text-2);margin-bottom:4px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;}
+.tok-row{display:grid;grid-template-columns:76px 1fr 44px;align-items:center;gap:8px;}
+.tok-row-label{font-size:11px;color:var(--text-2);}
+.tok-row-track{height:8px;background:var(--border);border-radius:3px;overflow:hidden;}
+.tok-row-fill{height:100%;border-radius:3px;}
+.tok-row-num{font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-2);text-align:right;}
+.tabs{display:flex;gap:2px;margin-bottom:0;}
+.tab-btn{padding:7px 14px;font-size:12px;font-weight:600;border:1px solid var(--border);border-bottom:none;background:var(--bg);color:var(--text-2);cursor:pointer;border-radius:5px 5px 0 0;outline:none;position:relative;bottom:-1px;}
+.tab-btn:focus-visible{outline:2px solid var(--sft1);outline-offset:2px;}
+.tab-btn.active{background:var(--bg-card);color:var(--text);border-color:var(--border);z-index:2;}
+.tab-btn.active.c-sft1{color:var(--sft1);}
+.tab-btn.active.c-sft2{color:var(--sft2);}
+.tab-btn.active.c-grpo{color:var(--grpo);}
+.tab-btn.active.c-qwen{color:var(--qwen);}
+.tab-panel{border:1px solid var(--border);border-radius:0 6px 6px 6px;background:var(--bg-card);padding:16px;position:relative;z-index:1;}
+.panel-meta{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.verdict{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:4px;}
+.verdict.ok{background:var(--ok-bg);color:var(--ok);}
+.verdict.bad{background:var(--bad-bg);color:var(--bad);}
+.tok-bar{display:flex;align-items:center;gap:8px;flex:1;min-width:180px;}
+.tok-label{font-size:11px;color:var(--text-2);white-space:nowrap;}
+.tok-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;max-width:200px;}
+.tok-fill{height:100%;border-radius:3px;}
+.tok-val{font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-2);min-width:36px;}
+.pred-row{font-size:12.5px;color:var(--text-2);}
+.pred-row strong{font-variant-numeric:tabular-nums;}
+.trace{background:var(--bg-code);border-radius:4px;padding:12px 14px;font-family:'SF Mono','Menlo','Courier New',monospace;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--text);margin-top:10px;max-height:400px;overflow-y:auto;}
+.think-open,.think-close{color:var(--text-2);font-style:italic;}
+.answer-line{font-weight:700;}
+.answer-ok{color:var(--ok);}
+.answer-bad{color:var(--bad);}
+hr.ex-rule{border:none;border-top:1px solid var(--border);margin:28px 0;}
+@media(max-width:600px){
+  .summary-strip{grid-template-columns:1fr 1fr;}
+  .tabs{flex-wrap:wrap;}
+  .ex-header{flex-wrap:wrap;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <div class="hdr-eye">Reasoning trace comparison · GSM8K Level 1</div>
+    <h1>Gemma SFT vs GRPO vs Qwen — same questions, 4 evals</h1>
+    <p>5 examples showing how thinking length and style varies across evaluation setups. Each tab shows the exact response for the same question.</p>
+  </div>
+
+  <div class="summary-strip">
+    <div class="ss-cell c-sft1">
+      <div class="ss-name">Gemma SFT L1</div>
+      <div class="ss-acc">79.6%</div>
+      <div class="ss-sub">684 think chars avg · 200 tok</div>
+    </div>
+    <div class="ss-cell c-sft2">
+      <div class="ss-name">Gemma SFT L2</div>
+      <div class="ss-acc">66.4%</div>
+      <div class="ss-sub">43 think chars avg · 23 tok</div>
+    </div>
+    <div class="ss-cell c-grpo">
+      <div class="ss-name">Gemma GRPO L1</div>
+      <div class="ss-acc">78.8%</div>
+      <div class="ss-sub">302 think chars avg · 110 tok</div>
+    </div>
+    <div class="ss-cell c-qwen">
+      <div class="ss-name">Qwen3 GRPO L1</div>
+      <div class="ss-acc">92.0%</div>
+      <div class="ss-sub">378 think chars avg · 126 tok</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--sft1)"></div><div class="leg-label">Gemma SFT L1 — verbose prose, long think block</div></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--sft2)"></div><div class="leg-label">Gemma SFT L2 — numbered steps, no think block</div></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--grpo)"></div><div class="leg-label">Gemma GRPO L1 — shorter think, RL-optimized</div></div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--qwen)"></div><div class="leg-label">Qwen3 GRPO L1 — reference model</div></div>
+  </div>
+
+  <!-- Ex 1 -->
+  <div class="example">
+    <div class="ex-header">
+      <div class="ex-num">Ex 1 / all correct</div>
+      <div class="ex-q">Jackson is planting tulips. He can fit 6 red tulips in a row and 8 blue tulips in a row. He buys 36 red tulips and 24 blue tulips. How many rows will Jackson plant?</div>
+      <div class="gold-badge">Gold: 9</div>
+    </div>
+    <div class="tok-compare">
+      <div class="tc-title">Think tokens per eval</div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft1)">SFT L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft1);width:97%"></div></div><div class="tok-row-num">194</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft2)">SFT L2</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft2);width:22%"></div></div><div class="tok-row-num">44</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--grpo)">GRPO L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--grpo);width:50%"></div></div><div class="tok-row-num">100</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--qwen)">Qwen L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--qwen);width:53%"></div></div><div class="tok-row-num">106</div></div>
+    </div>
+    <div class="tabs" data-ex="1">
+      <button class="tab-btn c-sft1 active" onclick="switchTab(1,'sft1')">SFT L1</button>
+      <button class="tab-btn c-sft2" onclick="switchTab(1,'sft2')">SFT L2</button>
+      <button class="tab-btn c-grpo" onclick="switchTab(1,'grpo')">GRPO L1</button>
+      <button class="tab-btn c-qwen" onclick="switchTab(1,'qwen')">Qwen L1</button>
+    </div>
+    <div class="tab-panel" id="ex1-sft1">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft1);width:97%"></div></div><span class="tok-val" style="color:var(--sft1)">194</span></div><span class="pred-row">Predicted: <strong>9</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Jackson is planting tulips. He can fit 6 red tulips in a row and 8 blue tulips in a row. He buys 36 red tulips and 24 blue tulips. We need to find the total number of rows he will plant.
+
+First, calculate how many rows of red tulips he can plant. Since each row holds 6 red tulips, we divide the total number of red tulips by 6. 36 divided by 6 equals 6 rows.
+
+Next, calculate how many rows of blue tulips he can plant. Since each row holds 8 blue tulips, we divide the total number of blue tulips by 8. 24 divided by 8 equals 3 rows.
+
+Therefore, the total number of rows Jackson will plant is 6 rows of red tulips plus 3 rows of blue tulips, which equals 9 rows.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 9</span></div>
+    </div>
+    <div class="tab-panel" id="ex1-sft2" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft2);width:22%"></div></div><span class="tok-val" style="color:var(--sft2)">44</span></div><span class="pred-row">Predicted: <strong>9</strong> · No think block — numbered steps only</span></div>
+      <div class="trace">1. <b>Red rows:</b> 36 red tulips / 6 per row = 6 rows
+2. <b>Blue rows:</b> 24 blue tulips / 8 per row = 3 rows
+3. <b>Total rows:</b> 6 + 3 = 9
+
+<span class="answer-line answer-ok"><b>Answer: 9</b></span></div>
+    </div>
+    <div class="tab-panel" id="ex1-grpo" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--grpo);width:50%"></div></div><span class="tok-val" style="color:var(--grpo)">100</span></div><span class="pred-row">Predicted: <strong>9</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Jackson can plant 6 red tulips in a row. He buys 36 red tulips, so the number of red rows is 36 divided by 6, which equals 6 rows. Jackson can plant 8 blue tulips in a row. He buys 24 blue tulips, so the number of blue rows is 24 divided by 8, which equals 3 rows. The total number of rows is 6 plus 3, which equals 9 rows.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 9</span></div>
+    </div>
+    <div class="tab-panel" id="ex1-qwen" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--qwen);width:53%"></div></div><span class="tok-val" style="color:var(--qwen)">106</span></div><span class="pred-row">Predicted: <strong>9</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Jackson has 36 red tulips. Each row holds 6 red tulips, so the number of rows needed for red tulips is 36 divided by 6, which equals 6 rows. He also has 24 blue tulips. Each row holds 8 blue tulips, so the number of rows needed for blue tulips is 24 divided by 8, which equals 3 rows. The total number of rows is 6 plus 3, which equals 9 rows.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 9</span></div>
+    </div>
+  </div>
+
+  <hr class="ex-rule">
+
+  <!-- Ex 2 -->
+  <div class="example">
+    <div class="ex-header">
+      <div class="ex-num">Ex 2 / all correct</div>
+      <div class="ex-q">Marty has 100 centimeters of ribbon that he must cut into 4 equal parts. Each of the 4 parts must be cut into 5 equal parts. How long will each final cut be?</div>
+      <div class="gold-badge">Gold: 5</div>
+    </div>
+    <div class="tok-compare">
+      <div class="tc-title">Think tokens per eval</div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft1)">SFT L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft1);width:100%"></div></div><div class="tok-row-num">150</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft2)">SFT L2</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft2);width:29%"></div></div><div class="tok-row-num">44</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--grpo)">GRPO L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--grpo);width:51%"></div></div><div class="tok-row-num">76</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--qwen)">Qwen L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--qwen);width:61%"></div></div><div class="tok-row-num">91</div></div>
+    </div>
+    <div class="tabs" data-ex="2">
+      <button class="tab-btn c-sft1 active" onclick="switchTab(2,'sft1')">SFT L1</button>
+      <button class="tab-btn c-sft2" onclick="switchTab(2,'sft2')">SFT L2</button>
+      <button class="tab-btn c-grpo" onclick="switchTab(2,'grpo')">GRPO L1</button>
+      <button class="tab-btn c-qwen" onclick="switchTab(2,'qwen')">Qwen L1</button>
+    </div>
+    <div class="tab-panel" id="ex2-sft1">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft1);width:100%"></div></div><span class="tok-val" style="color:var(--sft1)">150</span></div><span class="pred-row">Predicted: <strong>5</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Marty starts with a ribbon that is 100 centimeters long. He first cuts this ribbon into 4 equal parts. To find the length of each of these first cuts, we divide the total length by 4. So, 100 centimeters divided by 4 equals 25 centimeters. Therefore, each of the 4 parts is 25 centimeters long.
+
+Next, each of these 4 parts is divided into 5 equal parts. To find the length of each of these smaller cuts, we divide the length of one of the first parts by 5. So, 25 centimeters divided by 5 equals 5 centimeters.
+
+Therefore, each final cut will be 5 centimeters long.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 5</span></div>
+    </div>
+    <div class="tab-panel" id="ex2-sft2" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft2);width:29%"></div></div><span class="tok-val" style="color:var(--sft2)">44</span></div><span class="pred-row">Predicted: <strong>5</strong> · No think block</span></div>
+      <div class="trace">1. <b>Initial cut:</b> 100 cm ÷ 4 = 25 cm each
+2. <b>Second cut:</b> 25 cm ÷ 5 = 5 cm each
+3. <b>Final length:</b> 5 cm
+
+<span class="answer-line answer-ok"><b>Answer: 5</b></span></div>
+    </div>
+    <div class="tab-panel" id="ex2-grpo" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--grpo);width:51%"></div></div><span class="tok-val" style="color:var(--grpo)">76</span></div><span class="pred-row">Predicted: <strong>5</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Marty has 100 centimeters of ribbon. He cuts it into 4 equal parts, so each part is 100 divided by 4, which equals 25 centimeters. Then each of those 4 parts is divided into 5 equal parts, so each final cut is 25 divided by 5, which equals 5 centimeters.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 5</span></div>
+    </div>
+    <div class="tab-panel" id="ex2-qwen" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--qwen);width:61%"></div></div><span class="tok-val" style="color:var(--qwen)">91</span></div><span class="pred-row">Predicted: <strong>5</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Marty starts with 100 centimeters of ribbon. First, he cuts it into 4 equal parts. Each part is 100 ÷ 4 = 25 centimeters. Then, each of these 25-centimeter parts is divided into 5 equal parts. Each final cut is 25 ÷ 5 = 5 centimeters. Therefore, each final cut is 5 centimeters long.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 5</span></div>
+    </div>
+  </div>
+
+  <hr class="ex-rule">
+
+  <!-- Ex 3 -->
+  <div class="example">
+    <div class="ex-header">
+      <div class="ex-num">Ex 3 / SFT correct · GRPO wrong</div>
+      <div class="ex-q">John cuts down an 80-foot tree. He can make logs out of 80% of it. He cuts it into 4-foot logs. From each of those logs, he cuts 5 planks. He then sells each plank for $1.2. How much does he make?</div>
+      <div class="gold-badge">Gold: $96</div>
+    </div>
+    <div class="tok-compare">
+      <div class="tc-title">Think tokens per eval</div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft1)">SFT L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft1);width:100%"></div></div><div class="tok-row-num">230</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft2)">SFT L2</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft2);width:29%"></div></div><div class="tok-row-num">66</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--grpo)">GRPO L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--grpo);width:60%"></div></div><div class="tok-row-num">138</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--qwen)">Qwen L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--qwen);width:64%"></div></div><div class="tok-row-num">148</div></div>
+    </div>
+    <div class="tabs" data-ex="3">
+      <button class="tab-btn c-sft1 active" onclick="switchTab(3,'sft1')">SFT L1</button>
+      <button class="tab-btn c-sft2" onclick="switchTab(3,'sft2')">SFT L2</button>
+      <button class="tab-btn c-grpo" onclick="switchTab(3,'grpo')">GRPO L1</button>
+      <button class="tab-btn c-qwen" onclick="switchTab(3,'qwen')">Qwen L1</button>
+    </div>
+    <div class="tab-panel" id="ex3-sft1">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft1);width:100%"></div></div><span class="tok-val" style="color:var(--sft1)">230</span></div><span class="pred-row">Predicted: <strong>96</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+John starts with an 80-foot tree. He can make logs out of 80% of the tree. First, we calculate 80% of 80 feet: 0.8 × 80 = 64 feet.
+
+Next, he cuts these 64 feet into 4-foot logs. Number of logs = 64 ÷ 4 = 16 logs.
+
+From each of these 16 logs, he cuts 5 planks. Total planks = 16 × 5 = 80 planks.
+
+He sells each plank for $1.20. Total earnings = 80 × $1.20 = $96.00.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 96</span></div>
+    </div>
+    <div class="tab-panel" id="ex3-sft2" style="display:none">
+      <div class="panel-meta"><span class="verdict bad">Wrong ✗</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft2);width:29%"></div></div><span class="tok-val" style="color:var(--sft2)">66</span></div><span class="pred-row">Predicted: <strong>384</strong> · Gold: 96</span></div>
+      <div class="trace">1. <b>Total logs:</b> 80 ft × 80% = 64 logs   ← skips ÷4, treats feet as logs
+2. <b>Planks:</b> 64 × 5 = 320 planks
+3. <b>Revenue:</b> 320 × $1.2 = $384
+
+<span class="answer-line answer-bad"><b>Answer: 384</b>  ← missing the 64 ft ÷ 4 ft/log = 16 logs step</span></div>
+    </div>
+    <div class="tab-panel" id="ex3-grpo" style="display:none">
+      <div class="panel-meta"><span class="verdict bad">Wrong ✗</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--grpo);width:60%"></div></div><span class="tok-val" style="color:var(--grpo)">138</span></div><span class="pred-row">Predicted: <strong>1536</strong> · Gold: 96</span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+John cuts down an 80-foot tree. He can make logs out of 80% of it, so the number of logs is 80 × 0.8 = 64 logs.   ← treats 64 feet as 64 logs
+Each log is 4 feet long, so the total length of logs is 64 × 4 = 256 feet.   ← then multiplies back by 4!
+He cuts each log into 5 planks, so total planks = 256 × 5 = 1280.
+He sells each plank for $1.2: 1280 × 1.2 = 1536.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-bad">#### 1536  ← double-counted length: 64 "logs" × 4 ft × 5 planks × $1.2</span></div>
+    </div>
+    <div class="tab-panel" id="ex3-qwen" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--qwen);width:64%"></div></div><span class="tok-val" style="color:var(--qwen)">148</span></div><span class="pred-row">Predicted: <strong>96</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+John cuts down an 80-foot tree. He can make logs out of 80% of it, so the total length of logs is 0.8 × 80 = 64 feet.
+He cuts these logs into 4-foot logs, so the number of 4-foot logs is 64 ÷ 4 = 16 logs.
+From each log, he cuts 5 planks: 16 × 5 = 80 planks.
+He sells each plank for $1.2: 80 × 1.2 = $96.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 96</span></div>
+    </div>
+  </div>
+
+  <hr class="ex-rule">
+
+  <!-- Ex 4 -->
+  <div class="example">
+    <div class="ex-header">
+      <div class="ex-num">Ex 4 / GRPO correct · SFT wrong</div>
+      <div class="ex-q">Eve had 20 pieces of pomelos. After giving her friend some pomelos, Eve is left with 1/4 of the pomelos she originally had. How many pomelos did Eve give away?</div>
+      <div class="gold-badge">Gold: 15</div>
+    </div>
+    <div class="tok-compare">
+      <div class="tc-title">Think tokens per eval</div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft1)">SFT L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft1);width:100%"></div></div><div class="tok-row-num">89</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft2)">SFT L2</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft2);width:0%"></div></div><div class="tok-row-num">0</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--grpo)">GRPO L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--grpo);width:80%"></div></div><div class="tok-row-num">71</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--qwen)">Qwen L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--qwen);width:89%"></div></div><div class="tok-row-num">79</div></div>
+    </div>
+    <div class="tabs" data-ex="4">
+      <button class="tab-btn c-sft1 active" onclick="switchTab(4,'sft1')">SFT L1</button>
+      <button class="tab-btn c-sft2" onclick="switchTab(4,'sft2')">SFT L2</button>
+      <button class="tab-btn c-grpo" onclick="switchTab(4,'grpo')">GRPO L1</button>
+      <button class="tab-btn c-qwen" onclick="switchTab(4,'qwen')">Qwen L1</button>
+    </div>
+    <div class="tab-panel" id="ex4-sft1">
+      <div class="panel-meta"><span class="verdict bad">Wrong ✗</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft1);width:100%"></div></div><span class="tok-val" style="color:var(--sft1)">89</span></div><span class="pred-row">Predicted: <strong>5</strong> · Gold: 15</span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Eve originally had 20 pieces of pomelos. After giving some to her friend, she is left with 1/4 of the original amount. To find out how many pomelos she gave away, we first calculate what 1/4 of 20 is. One-fourth of 20 is 20 divided by 4, which equals 5. Therefore, Eve gave away 5 pomelos.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-bad">#### 5  ← found the remainder (5 left), reported it as "given away" — forgot 20 − 5 = 15</span></div>
+    </div>
+    <div class="tab-panel" id="ex4-sft2" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft2);width:0%"></div></div><span class="tok-val" style="color:var(--sft2)">0</span></div><span class="pred-row">Predicted: <strong>15</strong> · No think block at all</span></div>
+      <div class="trace">1. <b>Start:</b> 20 pomelos
+2. <b>Remaining:</b> 1/4 × 20 = 5
+3. <b>Given away:</b> 20 − 5 = 15
+4. <b>Answer:</b> 15
+
+<span class="answer-line answer-ok"><b>Answer: 15</b>  ← structured steps forces the subtraction explicitly</span></div>
+    </div>
+    <div class="tab-panel" id="ex4-grpo" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--grpo);width:80%"></div></div><span class="tok-val" style="color:var(--grpo)">71</span></div><span class="pred-row">Predicted: <strong>15</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Eve originally had 20 pomelos. After giving some away, she has 1/4 of that amount left. So the number left is 20 × (1/4) = 5 pomelos. The number given away is the original minus the left: 20 − 5 = 15 pomelos.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 15  ← GRPO learned to complete the subtraction that SFT L1 missed</span></div>
+    </div>
+    <div class="tab-panel" id="ex4-qwen" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--qwen);width:89%"></div></div><span class="tok-val" style="color:var(--qwen)">79</span></div><span class="pred-row">Predicted: <strong>15</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+Eve originally had 20 pomelos. After giving some away, she is left with 1/4 of the original amount. So the number she is left with is 1/4 × 20 = 5 pomelos. The number she gave away is the original minus the remaining: 20 − 5 = 15 pomelos.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 15</span></div>
+    </div>
+  </div>
+
+  <hr class="ex-rule">
+
+  <!-- Ex 5 -->
+  <div class="example">
+    <div class="ex-header">
+      <div class="ex-num">Ex 5 / Gemma wrong across all levels · Qwen correct</div>
+      <div class="ex-q">John drives for 3 hours at 60 mph and turns around. He tries to get home in 4 hours but spends the first 2 hours in standstill traffic, the next half-hour at 30 mph, then the remaining time at 80 mph. How far is he from home at the end of those 4 hours?</div>
+      <div class="gold-badge">Gold: 45</div>
+    </div>
+    <div class="tok-compare">
+      <div class="tc-title">Think tokens per eval</div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft1)">SFT L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft1);width:93%"></div></div><div class="tok-row-num">279</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--sft2)">SFT L2</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--sft2);width:44%"></div></div><div class="tok-row-num">133</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--grpo)">GRPO L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--grpo);width:48%"></div></div><div class="tok-row-num">143</div></div>
+      <div class="tok-row"><div class="tok-row-label" style="color:var(--qwen)">Qwen L1</div><div class="tok-row-track"><div class="tok-row-fill" style="background:var(--qwen);width:100%"></div></div><div class="tok-row-num">301</div></div>
+    </div>
+    <div class="tabs" data-ex="5">
+      <button class="tab-btn c-sft1 active" onclick="switchTab(5,'sft1')">SFT L1</button>
+      <button class="tab-btn c-sft2" onclick="switchTab(5,'sft2')">SFT L2</button>
+      <button class="tab-btn c-grpo" onclick="switchTab(5,'grpo')">GRPO L1</button>
+      <button class="tab-btn c-qwen" onclick="switchTab(5,'qwen')">Qwen L1</button>
+    </div>
+    <div class="tab-panel" id="ex5-sft1">
+      <div class="panel-meta"><span class="verdict bad">Wrong ✗</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft1);width:93%"></div></div><span class="tok-val" style="color:var(--sft1)">279</span></div><span class="pred-row">Predicted: <strong>75</strong> · Gold: 45</span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+John drives for 3 hours at 60 mph: 3 × 60 = 180 miles away.
+He turns around. First 2 hours: standstill, 0 miles.
+Next 0.5 hours at 30 mph: 0.5 × 30 = 15 miles toward home.
+Remaining 1.5 hours at 80 mph: 1.5 × 80 = 120 miles toward home.
+Total distance from home: 180 − 120 + 15 = 75 miles.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-bad">#### 75  ← sign error: processes left-to-right (180−120+15) instead of grouping (180−135)</span></div>
+    </div>
+    <div class="tab-panel" id="ex5-sft2" style="display:none">
+      <div class="panel-meta"><span class="verdict bad">Wrong ✗</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--sft2);width:44%"></div></div><span class="tok-val" style="color:var(--sft2)">133</span></div><span class="pred-row">Predicted: <strong>75</strong> · Gold: 45</span></div>
+      <div class="trace">1. <b>Distance away:</b> 3h × 60 mph = 180 miles
+2. <b>Traffic (2h):</b> 0 miles
+3. <b>At 30 mph (0.5h):</b> 15 miles toward home
+4. <b>At 80 mph (1.5h):</b> 120 miles toward home
+5. <b>Remaining:</b> 180 − 120 + 15 = 75 miles
+
+<span class="answer-line answer-bad"><b>Answer: 75</b>  ← same sign error even with structured format</span></div>
+    </div>
+    <div class="tab-panel" id="ex5-grpo" style="display:none">
+      <div class="panel-meta"><span class="verdict bad">Wrong ✗</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--grpo);width:48%"></div></div><span class="tok-val" style="color:var(--grpo)">143</span></div><span class="pred-row">Predicted: <strong>75</strong> · Gold: 45</span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+John drives for 3 hours at 60 mph: 3 × 60 = 180 miles away. He turns around.
+First 2 hours: standstill, 0 miles covered.
+Next 0.5 hours at 30 mph: 0.5 × 30 = 15 miles toward home.
+Remaining 1.5 hours at 80 mph: 1.5 × 80 = 120 miles toward home.
+Total from home: 180 − 120 + 15 = 75 miles.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-bad">#### 75  ← all three Gemma variants make identical sign-tracking error</span></div>
+    </div>
+    <div class="tab-panel" id="ex5-qwen" style="display:none">
+      <div class="panel-meta"><span class="verdict ok">Correct ✓</span><div class="tok-bar"><span class="tok-label">Think tokens:</span><div class="tok-track"><div class="tok-fill" style="background:var(--qwen);width:100%"></div></div><span class="tok-val" style="color:var(--qwen)">301</span></div><span class="pred-row">Predicted: <strong>45</strong></span></div>
+      <div class="trace"><span class="think-open">&lt;think&gt;</span>
+John drives for 3 hours at 60 mph: 3 × 60 = 180 miles away from home. He turns around.
+He spends 2 hours in standstill traffic — no movement.
+Next, 0.5h at 30 mph: 0.5 × 30 = 15 miles toward home.
+Remaining time: 4 − 2 − 0.5 = 1.5h at 80 mph: 1.5 × 80 = 120 miles toward home.
+Total distance covered toward home: 15 + 120 = 135 miles.   ← groups first!
+Distance from home: 180 − 135 = 45 miles.
+<span class="think-close">&lt;/think&gt;</span>
+<span class="answer-line answer-ok">#### 45  ← accumulates all "toward home" before subtracting from 180</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function switchTab(exId, tab) {
+  ['sft1','sft2','grpo','qwen'].forEach(function(p) {
+    var el = document.getElementById('ex'+exId+'-'+p);
+    if (el) el.style.display = p === tab ? '' : 'none';
+  });
+  var tabsEl = document.querySelector('[data-ex="'+exId+'"]');
+  if (!tabsEl) return;
+  tabsEl.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.getAttribute('onclick').indexOf("'"+tab+"'") !== -1);
+  });
+}
+</script>
+</body>
+</html>
