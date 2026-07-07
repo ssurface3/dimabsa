@@ -120,7 +120,7 @@ for L in "${LEVELS[@]}"; do
         --adapter "$SFT_ADAPTER" \
         --level   "$LEVEL_STR" \
         --output  "$OUTPUT" \
-        --batch_size 8
+        --batch_size 32
       ;;
 
     gemma_grpo)
@@ -139,7 +139,7 @@ for L in "${LEVELS[@]}"; do
         --adapter     "$GRPO_ADAPTER" \
         --level       "$LEVEL_STR" \
         --output      "$OUTPUT" \
-        --batch_size 8
+        --batch_size 32
       ;;
   esac
 
