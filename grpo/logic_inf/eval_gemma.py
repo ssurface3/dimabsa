@@ -49,13 +49,14 @@ LEVEL_STYLES = {
     "level 5": "Extreme",
 }
 
+import logging as _logging
+
 def _patch_peft_for_gemma4():
     """
     Gemma 4 E4B's vision encoder wraps Linear in Gemma4ClippableLinear.
-    PEFT tries to inject LoRA into every module whose name matches target_modules
-    (e.g. q_proj) — including vision encoder layers — and crashes on the custom type.
-    The SFT/GRPO adapters contain no vision weights (text-only training), so the
-    right behaviour is to silently skip unsupported module types.
+    PEFT tries to inject LoRA into every module matching target_modules —
+    including vision encoder layers — and crashes on the custom type.
+    Skip unsupported module types silently during injection.
     """
     try:
         from peft.tuners.lora.model import LoraModel
@@ -65,13 +66,29 @@ def _patch_peft_for_gemma4():
                 _orig(self, *args, **kwargs)
             except ValueError as e:
                 if "is not supported" in str(e):
-                    return  # skip Gemma4ClippableLinear silently
+                    return
                 raise
         LoraModel._create_and_replace = _patched
     except Exception:
         pass
 
 _patch_peft_for_gemma4()
+
+
+def _load_adapter(model, adapter_path: str):
+    """
+    Load a PEFT adapter while suppressing the 'unexpected keys' warnings that
+    come from vision_tower LoRA weights saved in the adapter but not injected
+    (because we skip Gemma4ClippableLinear during injection).
+    """
+    peft_log = _logging.getLogger("peft")
+    prev_level = peft_log.level
+    peft_log.setLevel(_logging.ERROR)
+    try:
+        model = PeftModel.from_pretrained(model, adapter_path)
+    finally:
+        peft_log.setLevel(prev_level)
+    return model
 
 
 def _base_from_adapter_config(adapter_path: str) -> str:
@@ -137,12 +154,12 @@ def main():
 
     if args.sft_adapter:
         print(f"Merging SFT adapter: {args.sft_adapter}")
-        model = PeftModel.from_pretrained(model, args.sft_adapter)
+        model = _load_adapter(model, args.sft_adapter)
         model = model.merge_and_unload()
 
     if args.adapter:
         print(f"Merging adapter: {args.adapter}")
-        model = PeftModel.from_pretrained(model, args.adapter)
+        model = _load_adapter(model, args.adapter)
         model = model.merge_and_unload()
 
     model.eval()
