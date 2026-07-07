@@ -49,6 +49,30 @@ LEVEL_STYLES = {
     "level 5": "Extreme",
 }
 
+def _patch_peft_for_gemma4():
+    """
+    Gemma 4 E4B's vision encoder wraps Linear in Gemma4ClippableLinear.
+    PEFT tries to inject LoRA into every module whose name matches target_modules
+    (e.g. q_proj) — including vision encoder layers — and crashes on the custom type.
+    The SFT/GRPO adapters contain no vision weights (text-only training), so the
+    right behaviour is to silently skip unsupported module types.
+    """
+    try:
+        from peft.tuners.lora.model import LoraModel
+        _orig = LoraModel._create_and_replace
+        def _patched(self, *args, **kwargs):
+            try:
+                _orig(self, *args, **kwargs)
+            except ValueError as e:
+                if "is not supported" in str(e):
+                    return  # skip Gemma4ClippableLinear silently
+                raise
+        LoraModel._create_and_replace = _patched
+    except Exception:
+        pass
+
+_patch_peft_for_gemma4()
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--model",       required=True,  help="Base model name or path")
 parser.add_argument("--sft_adapter", default="",     help="SFT adapter path (merged before GRPO adapter)")
